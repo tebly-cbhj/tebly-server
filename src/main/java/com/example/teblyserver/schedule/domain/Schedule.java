@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 @Table(name = "schedules")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("is_deleted = false")
 public class Schedule {
 
     @Id
@@ -48,7 +50,11 @@ public class Schedule {
     private LocalDateTime endTime;   // ERD의 end_time 반영
 
     @Column(nullable = false)
-    private String repeatType = "NONE"; // ERD의 기본값 'NONE' 반영
+    @Enumerated(EnumType.STRING)
+    private RepeatType repeatType = RepeatType.NONE; // ERD의 기본값 'NONE' 반영
+
+    @Column(nullable = false)
+    private boolean isDeleted = false;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -59,7 +65,7 @@ public class Schedule {
     private LocalDateTime updatedAt;
 
     // 정적 팩토리 메서드 업데이트 (OCR 로그 없이 생성할 때)
-    public static Schedule create(User user, String title, LocalDateTime startTime, LocalDateTime endTime, String repeatType) {
+    public static Schedule create(User user, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
         Schedule schedule = new Schedule();
         schedule.user = user;
         schedule.title = title;
@@ -67,5 +73,31 @@ public class Schedule {
         schedule.endTime = endTime;
         schedule.repeatType = repeatType;
         return schedule;
+    }
+
+    // 정적 팩토리 메서드 오버로딩 (나중에 OCR을 통해 생성할 때 쓸 생성 메서드)
+    // public static Schedule createWithOcr(User user, OcrLog ocrLog, String title, LocalDateTime startTime, LocalDateTime endTime, String repeatType) {
+    //     Schedule schedule = Schedule.create(user, title, startTime, endTime, repeatType);
+    //     schedule.ocrLog = ocrLog;
+    //     return schedule;
+    // }
+
+    public void update(String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
+        if (title != null && !title.isBlank()) {
+            this.title = title;
+        }
+        if (startTime != null) {
+            this.startTime = startTime;
+        }
+        if (endTime != null) {
+            this.endTime = endTime;
+        }
+        if (repeatType != null) {
+            this.repeatType = repeatType;
+        }
+    }
+
+    public void delete() {
+        this.isDeleted = true;
     }
 }
