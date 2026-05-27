@@ -58,4 +58,10 @@ public class User {
     public void softDelete() {
         this.isDeleted = true;
     }
+
+    public void updateProfile(String nickname, String profileImageUrl) {
+        if (nickname != null) this.nickname = nickname;
+        if (profileImageUrl != null) this.profileImageUrl = profileImageUrl;
+        this.isNewUser = false;
+    }
 }
