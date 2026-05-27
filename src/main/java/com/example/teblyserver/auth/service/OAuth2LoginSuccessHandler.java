@@ -1,6 +1,8 @@
 package com.example.teblyserver.auth.service;
 
+import com.example.teblyserver.auth.domain.RefreshToken;
 import com.example.teblyserver.auth.domain.User;
+import com.example.teblyserver.auth.repository.RefreshTokenRepository;
 import com.example.teblyserver.auth.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +21,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -35,6 +38,13 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
         String accessToken = jwtService.generateAccessToken(user.getId());
         String refreshToken = jwtService.generateRefreshToken(user.getId());
+
+        // refresh token DB에 저장
+        refreshTokenRepository.findById(user.getId())
+                .ifPresentOrElse(
+                        rt -> rt.updateToken(refreshToken),
+                        () -> refreshTokenRepository.save(RefreshToken.create(user.getId(), refreshToken))
+                );
 
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
