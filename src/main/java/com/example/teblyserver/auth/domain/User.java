@@ -54,4 +54,8 @@ public class User {
         user.profileImageUrl = profileImageUrl;
         return user;
     }
+
+    public void softDelete() {
+        this.isDeleted = true;
+    }
 }
