@@ -1,5 +1,6 @@
 package com.example.teblyserver.schedule.controller;
 
+import com.example.teblyserver.common.response.ApiResponse;
 import com.example.teblyserver.schedule.dto.request.ScheduleRequestDto;
 import com.example.teblyserver.schedule.dto.request.ScheduleUpdateRequestDto;
 import com.example.teblyserver.schedule.dto.response.ScheduleResponseDto;
@@ -25,7 +26,7 @@ public class ScheduleController {
      * URL: POST /schedules/events
      */
     @PostMapping("/events")
-    public ResponseEntity<Long> addSchedule(
+    public ResponseEntity<ApiResponse<Long>> addSchedule(
             @AuthenticationPrincipal Long userId,
             @RequestBody ScheduleRequestDto requestDto
             ) {
@@ -33,7 +34,7 @@ public class ScheduleController {
         Long scheduleId = scheduleService.addSchedule(userId, requestDto);
 
         // 프로트에 성공 시그널(HTTP 201 Created)과 함께 일정 ID를 반환
-        return ResponseEntity.status(HttpStatus.CREATED).body(scheduleId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("일정이 성공적으로 등록되었습니다.", scheduleId));
     }
 
     /**
@@ -41,7 +42,7 @@ public class ScheduleController {
      * URL: GET /schedules?view=weekly&date=2026-05-25
      */
     @GetMapping
-    public ResponseEntity<ScheduleResponseDto> getSchedules(
+    public ResponseEntity<ApiResponse<ScheduleResponseDto>> getSchedules(
             @AuthenticationPrincipal Long userId,
             @RequestParam(defaultValue = "weekly") String view,
             // YYYY-MM-DD 포맷의 문자열을 자바의 LocalDate 객체로 자동 파싱합니다.
@@ -49,7 +50,7 @@ public class ScheduleController {
     ) {
 
         ScheduleResponseDto response = scheduleService.getSchedules(userId, view, date);
-        return ResponseEntity.ok(response); // 200 OK 상태 코드와 함께 데이터를 반환합니다.
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -57,14 +58,14 @@ public class ScheduleController {
      * URL: PATCH /schedules/events/{scheduleId}
      */
     @PatchMapping("/events/{scheduleId}")
-    public ResponseEntity<Long> updateSchedule(
+    public ResponseEntity<ApiResponse<Long>> updateSchedule(
             @AuthenticationPrincipal Long userId, // 로그인한 유저 ID
             @PathVariable Long scheduleId,        // URL 경로에서 가져온 일정 PK
             @RequestBody ScheduleUpdateRequestDto requestDto // 수정할 내용들
     ) {
 
         Long updatedId = scheduleService.updateSchedule(userId, scheduleId, requestDto);
-        return ResponseEntity.ok(updatedId); // 200 OK 상태 코드와 함께 수정된 일정 ID 반환
+        return ResponseEntity.ok(ApiResponse.success("일정 정보가 성공적으로 수정되었습니다.", updatedId)); // 200 OK 상태 코드와 함께 수정된 일정 ID 반환
     }
 
     /**
@@ -72,12 +73,12 @@ public class ScheduleController {
      * URL: DELETE /schedules/events/{scheduleId}
      */
     @DeleteMapping("/events/{scheduleId}")
-    public ResponseEntity<Void> deleteSchedule(
+    public ResponseEntity<ApiResponse<Void>> deleteSchedule(
             @AuthenticationPrincipal Long userId, // 로그인한 유저 ID
             @PathVariable Long scheduleId         // URL 경로에서 가져온 일정 PK
     ) {
 
         scheduleService.deleteSchedule(userId, scheduleId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("일정이 성공적으로 삭제되었습니다.", null));
     }
 }

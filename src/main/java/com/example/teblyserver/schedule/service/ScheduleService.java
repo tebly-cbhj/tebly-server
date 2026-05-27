@@ -2,6 +2,8 @@ package com.example.teblyserver.schedule.service;
 
 import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.UserRepository;
+import com.example.teblyserver.common.exception.CustomException;
+import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.schedule.domain.Schedule;
 import com.example.teblyserver.schedule.dto.request.ScheduleRequestDto;
 import com.example.teblyserver.schedule.dto.request.ScheduleUpdateRequestDto;
@@ -34,7 +36,7 @@ public class ScheduleService {
 
         // 1. JWT 토큰에서 파싱되어 넘어온 userId로 DB에서 실제 User 엔티티를 찾음
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다. id=" + userId));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // 2. DTO 데이터와 유저 엔티티를 조합해 Schedule 객체를 새로 생성
         Schedule schedule = Schedule.create(
@@ -66,10 +68,13 @@ public class ScheduleService {
             // 월간: 해당 월의 1일 00:00:00 ~ 마지막 날 23:59:59
             startDateTime = baseDate.withDayOfMonth(1).atStartOfDay();
             endDateTime = baseDate.with(TemporalAdjusters.lastDayOfMonth()).atTime(LocalTime.MAX);
-        } else {
+        } else if ("weekly".equalsIgnoreCase(view)) {
             // 주간 (기본값): 월요일 00:00:00 ~ 일요일 23:59:59 (ISO 표준 기준)
             startDateTime = baseDate.with(DayOfWeek.MONDAY).atStartOfDay();
             endDateTime = baseDate.with(DayOfWeek.SUNDAY).atTime(LocalTime.MAX);
+        } else {
+            // weekly도 아니고 monthly도 아니면 400 에러
+            throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
         // 3. 계산된 기간으로 DB 조회
@@ -88,11 +93,11 @@ public class ScheduleService {
     public Long updateSchedule(Long userId, Long scheduleId, ScheduleUpdateRequestDto dto) {
         // 1. 수정할 일정을 조회
         Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 일정을 찾을 수 없습니다. id=" + scheduleId));
+                .orElseThrow(() -> new CustomException(ErrorCode.SCHEDULE_NOT_FOUND));
 
         // 2. 권한 검증: 일정을 생성한 유저와 수정을 요청한 로그인 유저가 일치하는지 확인
         if (!schedule.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("해당 일정을 수정할 권한이 없습니다.");
+            throw new CustomException(ErrorCode.SCHEDULE_FORBIDDEN);
         }
 
         // 3. 엔티티의 값을 변경
@@ -107,11 +112,11 @@ public class ScheduleService {
     public void deleteSchedule(Long userId, Long scheduleId) {
         // 1. 삭제할 일정을 조회
         Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 일정을 찾을 수 없습니다. id=" + scheduleId));
+                .orElseThrow(() -> new CustomException(ErrorCode.SCHEDULE_NOT_FOUND));
 
         // 2. 권한 검증: 일정을 생성한 유저와 삭제를 요청한 유저가 일치하는지 확인
         if (!schedule.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("해당 일정을 삭제할 권한이 없습니다.");
+            throw new CustomException(ErrorCode.SCHEDULE_FORBIDDEN);
         }
 
         // 3. soft-delete 수행 (상태값만 true로 변경)
