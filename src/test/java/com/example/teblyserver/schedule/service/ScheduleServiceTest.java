@@ -48,7 +48,6 @@ class ScheduleServiceTest {
         ReflectionTestUtils.setField(user, "id", userId);
         Schedule mockSchedule = Schedule.create(user, "테스트 일정", LocalDateTime.now(), LocalDateTime.now(), RepeatType.NONE);
 
-        // 핵심!: 가짜 Repository에게 "이런 조건으로 DB 조회하면 이거 반환해!"라고 미리 대본을 짜줍니다.
         given(scheduleRepository.findSchedulesWithinRange(eq(userId), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .willReturn(List.of(mockSchedule));
 
@@ -57,7 +56,7 @@ class ScheduleServiceTest {
 
         // Then (검증)
         assertThat(response).isNotNull();
-        // 가짜 DB가 1개를 뱉었으니, DTO 결과물 안에도 1개가 있어야 정상이겠죠?
+
         assertThat(response.events()).hasSize(1);
         assertThat(response.events().get(0).title()).isEqualTo("테스트 일정");
     }
@@ -77,13 +76,12 @@ class ScheduleServiceTest {
 
         Schedule mockSchedule = Schedule.create(owner, "진짜 주인의 일정", LocalDateTime.now(), LocalDateTime.now(), RepeatType.NONE);
 
-        // 가짜 DB 대본: 100번 일정 내놔! 하면 주인이 2번인 가짜 일정을 뱉어라
         given(scheduleRepository.findById(scheduleId)).willReturn(Optional.of(mockSchedule));
 
         ScheduleUpdateRequestDto requestDto = new ScheduleUpdateRequestDto("해킹 시도", LocalDateTime.now(), LocalDateTime.now(), RepeatType.NONE);
 
         // When & Then (실행 및 검증)
-        // 1번 유저(loginUserId)가 100번 일정을 수정하려고 하면 403 에러가 터져야 성공!
+        // 1번 유저(loginUserId)가 100번 일정을 수정하려고 하면 403 에러가 터져야 성공
         CustomException exception = assertThrows(CustomException.class, () -> {
             scheduleService.updateSchedule(loginUserId, scheduleId, requestDto);
         });
