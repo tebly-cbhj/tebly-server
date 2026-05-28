@@ -1,7 +1,9 @@
 package com.example.teblyserver.auth.controller;
 
 import com.example.teblyserver.auth.dto.UserProfileRequest;
+import com.example.teblyserver.auth.dto.UserProfileResponse;
 import com.example.teblyserver.auth.service.UserService;
+import com.example.teblyserver.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,16 +18,16 @@ public class UserController {
     private final UserService userService;
 
     @PatchMapping("/me")
-    public ResponseEntity<?> updateProfile(
+    public ResponseEntity<ApiResponse<Void>> updateProfile(
             @AuthenticationPrincipal Long userId,
             @RequestBody UserProfileRequest request) {
         userService.updateProfile(userId, request);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getMyProfile(
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
             @AuthenticationPrincipal Long userId) {
-        return ResponseEntity.ok(userService.getMyProfile(userId));
+        return ResponseEntity.ok(ApiResponse.success(userService.getMyProfile(userId)));
     }
 }

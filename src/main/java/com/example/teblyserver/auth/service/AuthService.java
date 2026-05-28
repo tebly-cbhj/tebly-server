@@ -4,6 +4,8 @@ import com.example.teblyserver.auth.domain.RefreshToken;
 import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.RefreshTokenRepository;
 import com.example.teblyserver.auth.repository.UserRepository;
+import com.example.teblyserver.common.exception.CustomException;
+import com.example.teblyserver.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +24,7 @@ public class AuthService {
     @Transactional
     public Map<String, String> reissue(String refreshToken) {
         RefreshToken stored = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(() -> new RuntimeException("유효하지 않은 refresh token"));
+                .orElseThrow(() -> new CustomException(ErrorCode.UNAUTHORIZED));
 
         Long userId = jwtService.getUserId(refreshToken);
 
@@ -48,7 +50,7 @@ public class AuthService {
     @Transactional
     public void withdraw(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다"));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         // soft delete
         user.softDelete();
         refreshTokenRepository.deleteById(userId);
