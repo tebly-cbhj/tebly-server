@@ -28,10 +28,9 @@ public class Schedule {
     private User user;
 
     // 🔗 [연관관계] 일정 카테고리 (1 : N)
-    // TODO: Category 엔티티 구현 후 주석 해제 예정
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "category_id", nullable = false)
-    // private Category category;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     // 🔗 [이번에 추가된 꿀필드!] OCR 인식 기록 연관관계 (1 : N)
     // 이미지로 생성된 일정이 아닐 수도 있으므로 nullable = true(기본값)로 둡니다.
@@ -65,9 +64,10 @@ public class Schedule {
     private LocalDateTime updatedAt;
 
     // 정적 팩토리 메서드 업데이트 (OCR 로그 없이 생성할 때)
-    public static Schedule create(User user, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
+    public static Schedule create(User user, Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
         Schedule schedule = new Schedule();
         schedule.user = user;
+        schedule.category = category;
         schedule.title = title;
         schedule.startTime = startTime;
         schedule.endTime = endTime;
@@ -82,7 +82,10 @@ public class Schedule {
     //     return schedule;
     // }
 
-    public void update(String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
+    public void update(Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
+        if (category != null) {
+            this.category = category; // 일정 수정 시 카테고리 수정 가능
+        }
         if (title != null && !title.isBlank()) {
             this.title = title;
         }

@@ -4,11 +4,13 @@ import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.UserRepository;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
+import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.Schedule;
 import com.example.teblyserver.schedule.dto.request.ScheduleRequestDto;
 import com.example.teblyserver.schedule.dto.request.ScheduleUpdateRequestDto;
 import com.example.teblyserver.schedule.dto.response.EventDto;
 import com.example.teblyserver.schedule.dto.response.ScheduleResponseDto;
+import com.example.teblyserver.schedule.repository.CategoryRepository;
 import com.example.teblyserver.schedule.repository.ScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ public class ScheduleService {
 
     private final ScheduleRepository scheduleRepository;
     private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
 
     // 일정 직접 추가
     @Transactional
@@ -38,22 +41,33 @@ public class ScheduleService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 2. DTO 데이터와 유저 엔티티를 조합해 Schedule 객체를 새로 생성
+        // 2. DTO에서 넘어온 categoryId로 실제 Category 엔티티를 찾음
+        Category category = categoryRepository.findById(requestDto.categoryId())
+                .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        // [보안 검증] 내 일정을 만드는데 남의 커스텀 카테고리를 훔쳐 쓰지 못하도록 방어 (2차 방어)
+        // 시스템 디폴트 카테고리가 '아니면서' + 카테고리 주인의 ID가 내 ID와 '다르다면' 에러 발생
+        if (!category.getUser().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN); // "해당 카테고리에 대한 권한이 없습니다."
+        }
+
+        // 3. DTO 데이터와 유저 엔티티를 조합해 Schedule 객체를 새로 생성
         Schedule schedule = Schedule.create(
                 user,
+                category,
                 requestDto.title(),
                 requestDto.startTime(),
                 requestDto.endTime(),
                 requestDto.repeatType()
         );
 
-        // 3. Repository를 통해 DB에 최종 저장
+        // 4. Repository를 통해 DB에 최종 저장
         Schedule savedSchedule = scheduleRepository.save(schedule);
 
         return savedSchedule.getId();
     }
 
-    // 일정 조회
+    // 자기 자신 일정 조회
     @Transactional(readOnly = true)
     public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
 
@@ -82,11 +96,16 @@ public class ScheduleService {
 
         // 4. DTO 변환 후 반환
         List<EventDto> eventDtos = schedules.stream()
-                .map(EventDto::from)
+                .map(schedule -> EventDto.from(schedule, userId))
                 .collect(Collectors.toList());
 
         return ScheduleResponseDto.from(eventDtos);
     }
+
+    /*
+     * TODO: 친구 일정 조회하는 서비스 로직 구현 필요
+     */
+
 
     // 일정 수정
     @Transactional
@@ -100,8 +119,22 @@ public class ScheduleService {
             throw new CustomException(ErrorCode.SCHEDULE_FORBIDDEN);
         }
 
-        // 3. 엔티티의 값을 변경
-        schedule.update(dto.title(), dto.startTime(), dto.endTime(), dto.repeatType());
+        // 3. [카테고리 변경 처리 및 권한 검증]
+        // DTO에 categoryId가 넘어왔다면, 해당 카테고리를 조회하고 내 것인지 검증
+        Category category = null;
+        if (dto.categoryId() != null) {
+            category = categoryRepository.findById(dto.categoryId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
+
+            // 새로 바꾸려는 카테고리의 주인이 내가 맞는지 확인
+            if (!category.getUser().getId().equals(userId)) {
+                throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN);
+            }
+        }
+
+
+        // 4. 엔티티의 값을 변경
+        schedule.update(category, dto.title(), dto.startTime(), dto.endTime(), dto.repeatType());
 
         // 별도로 repository.save()를 하지 않아도 됨, @Transactional 덕분에 Dirty-checking
         return schedule.getId();

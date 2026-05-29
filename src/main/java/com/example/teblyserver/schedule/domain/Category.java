@@ -71,7 +71,7 @@ public class Category {
         if (isPrivate != null) this.isPrivate = isPrivate;
     }
 
-    // 🌟 디폴트 카테고리용 전용 수정 (오직 비공개 여부만 토글 가능!)
+    // 디폴트 카테고리용 전용 수정 (오직 비공개 여부만 토글 가능)
     public void updatePrivacyOnly(boolean isPrivate) {
         this.isPrivate = isPrivate;
     }

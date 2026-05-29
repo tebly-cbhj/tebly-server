@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 
 public record ScheduleUpdateRequestDto(
+        @JsonProperty("category_id")
+        Long categoryId,
         String title,
         @JsonProperty("start_at")
         LocalDateTime startTime,

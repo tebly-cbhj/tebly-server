@@ -32,6 +32,9 @@ public enum ErrorCode {
     SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "SCHEDULE_404_1", "해당 일정을 찾을 수 없습니다."),
     SCHEDULE_FORBIDDEN(HttpStatus.FORBIDDEN, "SCHEDULE_403_1", "해당 일정을 수정/삭제할 권한이 없습니다."),
 
+    CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CATEGORY_404_1", "존재하지 않는 카테고리입니다."),
+    CATEGORY_FORBIDDEN(HttpStatus.FORBIDDEN, "CATEGORY_403_1", "해당 카테고리에 대한 접근 권한이 없습니다."),
+
     // 5xx - Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500_1", "서버 내부 오류가 발생했습니다.");
 
