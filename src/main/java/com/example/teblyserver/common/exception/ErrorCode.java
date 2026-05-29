@@ -34,6 +34,7 @@ public enum ErrorCode {
 
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CATEGORY_404_1", "존재하지 않는 카테고리입니다."),
     CATEGORY_FORBIDDEN(HttpStatus.FORBIDDEN, "CATEGORY_403_1", "해당 카테고리에 대한 접근 권한이 없습니다."),
+    DUPLICATE_CATEGORY_NAME(HttpStatus.CONFLICT, "CATEGORY_409_1", "이미 존재하는 카테고리 이름입니다."),
 
     // 5xx - Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500_1", "서버 내부 오류가 발생했습니다.");
