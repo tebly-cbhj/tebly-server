@@ -14,11 +14,11 @@ import java.util.List;
 @Repository
 public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
-    // 특정 유저의 일정만 뽑아오는 메서드
-    List<Schedule> findByUserIdAndIsDeletedFalse(Long userId);
-
-    // 특정 기간 사이에 포함된 일정만 조회 (Soft Delete인 데이터는 엔티티의 @SQLRestriction 등에 의해 자동 필터링됨)
-    @Query("SELECT s FROM Schedule s WHERE s.user.id = :userId " +
+    // 특정 기간 사이에 포함된 일정만 조회 (N+1 방지를 위한 FETCH JOIN 추가)
+    @Query("SELECT s FROM Schedule s " +
+            "JOIN FETCH s.category c " +
+            "JOIN FETCH s.user u " +
+            "WHERE s.user.id = :userId " +
             "AND s.startTime <= :endDateTime AND s.endTime >= :startDateTime")
     List<Schedule> findSchedulesWithinRange(
             @Param("userId") Long userId,
