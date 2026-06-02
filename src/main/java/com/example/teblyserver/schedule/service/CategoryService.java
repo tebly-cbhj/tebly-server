@@ -27,6 +27,25 @@ public class CategoryService {
 
     private static final String DEFAULT_ETC_CATEGORY_NAME = "기타";
 
+    // 신규 유저가 가입 시 디폴트 카테고리 DB에 자동 등록
+    @Transactional
+    public void createDefaultCategories(User user) {
+        List<Category> defaultCategories = List.of(
+                // TODO : ICON URL 나오면 수정
+                Category.createDefault(user, "수업", "iconUrl"),
+                Category.createDefault(user, "팀프로젝트", "iconUrl"),
+                Category.createDefault(user, "자기개발", "iconUrl"),
+                Category.createDefault(user, "동아리", "iconUrl"),
+                Category.createDefault(user, "알바", "iconUrl"),
+                Category.createDefault(user, "약속", "iconUrl"),
+                Category.createDefault(user, "여가", "iconUrl"),
+                Category.createDefault(user, "가족", "iconUrl"),
+                Category.createDefault(user, "기타", "iconUrl") // 9번째는 무조건 '기타'
+        );
+
+        categoryRepository.saveAll(defaultCategories);
+    }
+
     /**
      * 유저의 전체 카테고리 목록 조회
      */
