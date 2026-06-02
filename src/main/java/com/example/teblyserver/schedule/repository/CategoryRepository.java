@@ -4,6 +4,7 @@ import com.example.teblyserver.schedule.domain.Category;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
     /**
@@ -19,4 +20,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
      * 또 만들려고 하면 막아주기 위한 검증용 메서드
      */
     boolean existsByUserIdAndName(Long userId, String name);
+
+    Optional<Category> findByUserIdAndNameAndIsDefaultTrue(Long userId, String name);
 }

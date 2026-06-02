@@ -1,7 +1,9 @@
 package com.example.teblyserver.schedule.repository;
 
+import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.Schedule;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,5 +24,13 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("userId") Long userId,
             @Param("startDateTime") LocalDateTime startDateTime,
             @Param("endDateTime") LocalDateTime endDateTime
+    );
+
+    // 타겟 카테고리를 가진 모든 일정을 기본 카테고리로 일괄 업데이트
+    @Modifying(clearAutomatically = true) // 벌크 연산 후 영속성 컨텍스트(캐시)를 비워주는 필수 옵션
+    @Query("UPDATE Schedule s SET s.category = :defaultCategory WHERE s.category = :targetCategory")
+    int migrateCategory(
+            @Param("targetCategory") Category targetCategory,
+            @Param("defaultCategory") Category defaultCategory
     );
 }

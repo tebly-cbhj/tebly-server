@@ -9,6 +9,7 @@ import com.example.teblyserver.schedule.dto.request.CategoryCreateRequestDto;
 import com.example.teblyserver.schedule.dto.request.CategoryUpdateRequestDto;
 import com.example.teblyserver.schedule.dto.response.CategoryResponseDto;
 import com.example.teblyserver.schedule.repository.CategoryRepository;
+import com.example.teblyserver.schedule.repository.ScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,9 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository; // 유저 검증을 위한 주입
+    private final ScheduleRepository scheduleRepository;
+
+    private static final String DEFAULT_ETC_CATEGORY_NAME = "기타";
 
     /**
      * 유저의 전체 카테고리 목록 조회
@@ -114,11 +118,34 @@ public class CategoryService {
         return category.getId();
     }
 
-    /*
-    * TODO: 삭제 로직 구현
-    * 생각해봐야 할 것
-    *  - 카테고리 삭제시 연관되어 있는 일정들은 어떻게 할 것인지
-    *  - 카테고리의 용도? 카테고리 별로 모아서 일정 조회? 그냥 일정 조회 시에 카테고리가 들어가나? 색갈같은걸로 구분?
-    *  - 카테고리를 nullable=false 로 설정하면 어떨까..
+    /**
+     * 카테고리 삭제
      */
+    @Transactional
+    public void deleteCategory(Long categoryId, Long userId) {
+
+        // 1. 삭제하려는 타겟 카테고리 조회
+        Category targetCategory = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        // 2. 권한 검증 (내 카테고리가 맞는지?)
+        if (!targetCategory.getUser().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN); // 권한 없음 에러
+        }
+
+        // 3. 방어 로직: 유저가 9개의 '디폴트 카테고리' 중 하나를 삭제하려고 하면 막음
+        if (targetCategory.isDefault()) {
+            throw new CustomException(ErrorCode.CANNOT_DELETE_DEFAULT_CATEGORY);
+        }
+
+        // 4. 현재 로그인한 유저의 진짜 '기타' 카테고리를 DB에서 동적으로 조회합니다.
+        Category etcCategory = categoryRepository.findByUserIdAndNameAndIsDefaultTrue(userId, DEFAULT_ETC_CATEGORY_NAME)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEFAULT_CATEGORY_MISSING));
+        // "기타 카테고리가 DB에 없습니다" (서버 내부 로직 에러)
+
+        // 5. 일정 마이그레이션 (벌크 업데이트 쿼리 실행)
+        int migratedCount = scheduleRepository.migrateCategory(targetCategory, etcCategory);
+
+        categoryRepository.delete(targetCategory);
+    }
 }

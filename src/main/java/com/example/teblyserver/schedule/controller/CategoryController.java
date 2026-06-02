@@ -63,7 +63,19 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.success("카테고리가 성공적으로 수정되었습니다.", updatedId));
     }
 
-    /*
-    * TODO: 카테고리 삭제 API 구현
+    /**
+     * 카테고리 삭제 API (Delete)
+     * URL: DELETE /schedules/categories/{category_id}
      */
+    @DeleteMapping("/{categoryId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long categoryId
+    ) {
+        // 1. 서비스 로직 호출 (마이그레이션 + 삭제 진행)
+        categoryService.deleteCategory(categoryId, userId);
+
+        // 2. 성공 메시지 반환
+        return ResponseEntity.ok(ApiResponse.success("카테고리가 성공적으로 삭제되었습니다.", null));
+    }
 }
