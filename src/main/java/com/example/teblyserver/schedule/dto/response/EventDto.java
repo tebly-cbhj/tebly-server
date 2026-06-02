@@ -28,11 +28,14 @@ public record EventDto(
         boolean isMasked = !schedule.getUser().getId().equals(loginUserId)
                 && categoryEntity.isPrivate();
 
+        // 마스킹 상태라면 제목도 "일정"으로 덮어씌움
+        String displayTitle = isMasked ? "일정" : schedule.getTitle();
+
         return new EventDto(
                 schedule.getId(),
                 // 가려야 하는지 여부(isMasked)를 넘겨주면 CategoryResponseDto가 알아서 판단해서 변환
                 CategoryResponseDto.of(categoryEntity, isMasked),
-                schedule.getTitle(),
+                displayTitle,
                 schedule.getStartTime(),
                 schedule.getEndTime(),
                 schedule.getRepeatType()
