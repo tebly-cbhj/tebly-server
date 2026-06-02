@@ -5,6 +5,7 @@ import com.example.teblyserver.schedule.dto.request.CategoryCreateRequestDto;
 import com.example.teblyserver.schedule.dto.request.CategoryUpdateRequestDto;
 import com.example.teblyserver.schedule.dto.response.CategoryResponseDto;
 import com.example.teblyserver.schedule.service.CategoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,7 +40,7 @@ public class CategoryController {
     @PostMapping
     public ResponseEntity<ApiResponse<Long>> createCategory(
             @AuthenticationPrincipal Long userId,
-            @RequestBody CategoryCreateRequestDto requestDto
+            @Valid @RequestBody CategoryCreateRequestDto requestDto
     ) {
         Long categoryId = categoryService.createCategory(userId, requestDto);
 
@@ -67,7 +68,7 @@ public class CategoryController {
      * 카테고리 삭제 API (Delete)
      * URL: DELETE /schedules/categories/{category_id}
      */
-    @DeleteMapping("/{categoryId}")
+    @DeleteMapping("/{category_id}")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long categoryId

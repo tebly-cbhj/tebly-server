@@ -5,6 +5,7 @@ import com.example.teblyserver.schedule.dto.request.ScheduleRequestDto;
 import com.example.teblyserver.schedule.dto.request.ScheduleUpdateRequestDto;
 import com.example.teblyserver.schedule.dto.response.ScheduleResponseDto;
 import com.example.teblyserver.schedule.service.ScheduleService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -28,7 +29,7 @@ public class ScheduleController {
     @PostMapping("/events")
     public ResponseEntity<ApiResponse<Long>> addSchedule(
             @AuthenticationPrincipal Long userId,
-            @RequestBody ScheduleRequestDto requestDto
+            @Valid @RequestBody ScheduleRequestDto requestDto
             ) {
 
         Long scheduleId = scheduleService.addSchedule(userId, requestDto);
