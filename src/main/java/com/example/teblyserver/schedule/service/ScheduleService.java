@@ -32,6 +32,7 @@ public class ScheduleService {
     private final ScheduleRepository scheduleRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    // private final FriendService friendService;
 
     // 일정 직접 추가
     @Transactional
@@ -46,7 +47,6 @@ public class ScheduleService {
                 .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
 
         // [보안 검증] 내 일정을 만드는데 남의 커스텀 카테고리를 훔쳐 쓰지 못하도록 방어 (2차 방어)
-        // 시스템 디폴트 카테고리가 '아니면서' + 카테고리 주인의 ID가 내 ID와 '다르다면' 에러 발생
         if (!category.getUser().getId().equals(userId)) {
             throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN); // "해당 카테고리에 대한 권한이 없습니다."
         }
@@ -67,13 +67,10 @@ public class ScheduleService {
         return savedSchedule.getId();
     }
 
-    // 자기 자신 일정 조회
-    @Transactional(readOnly = true)
-    public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
-
+    // 1️. [공통 로직] 날짜 계산 + DB 조회만 담당하는 도우미 메서드 (private)
+    private List<Schedule> fetchSchedules(Long targetUserId, String view, LocalDate targetDate) {
         // 1. 만약 프론트에서 date를 안 보내줬다면(null), 오늘 날짜를 기본값으로 잡음
         LocalDate baseDate = (targetDate != null) ? targetDate : LocalDate.now();
-
         LocalDateTime startDateTime;
         LocalDateTime endDateTime;
 
@@ -92,9 +89,16 @@ public class ScheduleService {
         }
 
         // 3. 계산된 기간으로 DB 조회
-        List<Schedule> schedules = scheduleRepository.findSchedulesWithinRange(userId, startDateTime, endDateTime);
+        return scheduleRepository.findSchedulesWithinRange(targetUserId, startDateTime, endDateTime);
+    }
 
-        // 4. DTO 변환 후 반환
+    // 자기 자신 일정 조회
+    @Transactional(readOnly = true)
+    public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
+
+        List<Schedule> schedules = fetchSchedules(userId, view, targetDate);
+
+        // DTO 변환 후 반환
         List<EventDto> eventDtos = schedules.stream()
                 .map(schedule -> EventDto.from(schedule, userId))
                 .collect(Collectors.toList());
@@ -102,9 +106,34 @@ public class ScheduleService {
         return ScheduleResponseDto.from(eventDtos);
     }
 
-    /*
-     * TODO: 친구 일정 조회하는 서비스 로직 구현 필요
+    /**
+     * 친구 일정 조회 (Strategy B 적용)
      */
+    @Transactional(readOnly = true)
+    public ScheduleResponseDto getFriendSchedules(Long myUserId, Long friendId, String view, LocalDate targetDate) {
+
+        // =====================================================================
+        // TODO: 이 부분에 Friend 도메인의 친구 확인 로직을 연결해 주세요!
+        // boolean isFriend = friendService.isFriend(myUserId, friendId);
+        // =====================================================================
+
+        // (임시) 테스트위해 무조건 친구라고 가정하고 통과
+        boolean isFriend = true;
+
+        if (!isFriend) {
+            // TODO: (에러 코드도 추가해주세요)
+            //throw new CustomException(ErrorCode.FRIEND_FORBIDDEN);
+        }
+
+        List<Schedule> friendSchedules = fetchSchedules(friendId, view, targetDate);
+
+        List<EventDto> eventDtos = friendSchedules.stream()
+                // myUserId를 넘겨주면 EventDto 내부에서 주인이 다름을 감지하고 마스킹(true)
+                .map(schedule -> EventDto.from(schedule, myUserId))
+                .collect(Collectors.toList());
+
+        return ScheduleResponseDto.from(eventDtos);
+    }
 
 
     // 일정 수정
