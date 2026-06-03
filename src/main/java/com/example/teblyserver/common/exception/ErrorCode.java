@@ -29,6 +29,7 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON_404_1", "요청한 리소스를 찾을 수 없습니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_404_1", "사용자를 찾을 수 없습니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "USER_409_1", "이미 사용 중인 닉네임입니다."),
+    DUPLICATE_FRIENDSHIP(HttpStatus.CONFLICT, "FRIEND_409_1", "이미 친구입니다."),
 
     // 5xx - Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500_1", "서버 내부 오류가 발생했습니다.");

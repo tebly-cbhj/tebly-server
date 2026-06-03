@@ -29,4 +29,10 @@ public class UserService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return new UserProfileResponse(user);
     }
+
+    public String getInviteCode(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return user.getInvitationCode();
+    }
 }

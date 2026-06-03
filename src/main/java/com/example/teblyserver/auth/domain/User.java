@@ -52,6 +52,7 @@ public class User {
         user.oauthId = oauthId;
         user.nickname = nickname;
         user.profileImageUrl = profileImageUrl;
+        user.invitationCode = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         return user;
     }
 

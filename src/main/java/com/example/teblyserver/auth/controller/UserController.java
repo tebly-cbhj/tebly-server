@@ -30,4 +30,10 @@ public class UserController {
             @AuthenticationPrincipal Long userId) {
         return ResponseEntity.ok(ApiResponse.success(userService.getMyProfile(userId)));
     }
+
+    @GetMapping("/me/invite-code")
+    public ResponseEntity<ApiResponse<?>> getInviteCode(
+            @AuthenticationPrincipal Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(userService.getInviteCode(userId)));
+    }
 }
