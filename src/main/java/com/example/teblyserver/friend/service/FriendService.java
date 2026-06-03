@@ -7,10 +7,13 @@ import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.friend.domain.Friendship;
 import com.example.teblyserver.friend.dto.FriendResponse;
 import com.example.teblyserver.friend.repository.FriendshipRepository;
+import com.example.teblyserver.schedule.dto.response.ScheduleResponseDto;
+import com.example.teblyserver.schedule.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -19,6 +22,7 @@ public class FriendService {
 
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
+    private final ScheduleService scheduleService;
 
     // 친구 목록 조회
     public List<FriendResponse> getFriends(Long userId) {
@@ -79,5 +83,23 @@ public class FriendService {
                         .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND)));
 
         friendshipRepository.delete(friendship);
+    }
+
+    // 친구 일정 조회
+    public ScheduleResponseDto getFriendSchedule(Long userId, Long friendId, String view, LocalDate targetDate) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        User friend = userRepository.findById(friendId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 친구 관계인지 확인
+        boolean isFriend = friendshipRepository.existsByRequesterAndReceiver(user, friend)
+                || friendshipRepository.existsByRequesterAndReceiver(friend, user);
+
+        if (!isFriend) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        return scheduleService.getSchedules(friendId, view, targetDate);
     }
 }

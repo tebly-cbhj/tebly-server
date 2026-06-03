@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+
 @RestController
 @RequestMapping("/friends")
 @RequiredArgsConstructor
@@ -45,5 +47,16 @@ public class FriendController {
             @PathVariable Long friendId) {
         friendService.deleteFriend(userId, friendId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 친구 일정 조회
+    @GetMapping("/{friendId}/schedules")
+    public ResponseEntity<ApiResponse<?>> getFriendSchedule(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long friendId,
+            @RequestParam String view,
+            @RequestParam(required = false) LocalDate targetDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                friendService.getFriendSchedule(userId, friendId, view, targetDate)));
     }
 }
