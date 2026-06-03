@@ -41,4 +41,21 @@ public record EventDto(
                 schedule.getRepeatType()
         );
     }
+
+    // 반복 일정을 캘린더에 뿌려주기 위해 시간만 갈아끼우는 전용 팩토리 메서드
+    public static EventDto fromExpanded(Schedule schedule, Long loginUserId, LocalDateTime expandedStart, LocalDateTime expandedEnd) {
+        Category categoryEntity = schedule.getCategory();
+
+        boolean isMasked = !schedule.getUser().getId().equals(loginUserId) && categoryEntity.isPrivate();
+        String displayTitle = isMasked ? "일정" : schedule.getTitle();
+
+        return new EventDto(
+                schedule.getId(),
+                CategoryResponseDto.of(categoryEntity, isMasked),
+                displayTitle,
+                expandedStart, // 새롭게 계산된 반복 시간
+                expandedEnd,   // 새롭게 계산된 반복 종료 시간
+                schedule.getRepeatType()
+        );
+    }
 }

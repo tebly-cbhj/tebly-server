@@ -5,6 +5,7 @@ import com.example.teblyserver.auth.repository.UserRepository;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.schedule.domain.Category;
+import com.example.teblyserver.schedule.domain.RepeatType;
 import com.example.teblyserver.schedule.domain.Schedule;
 import com.example.teblyserver.schedule.dto.request.ScheduleRequestDto;
 import com.example.teblyserver.schedule.dto.request.ScheduleUpdateRequestDto;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -67,8 +69,8 @@ public class ScheduleService {
         return savedSchedule.getId();
     }
 
-    // 1️. [공통 로직] 날짜 계산 + DB 조회만 담당하는 도우미 메서드 (private)
-    private List<Schedule> fetchSchedules(Long targetUserId, String view, LocalDate targetDate) {
+    private List<EventDto> getExpandedEventDtos(Long targetUserId, Long loginUserId, String view, LocalDate targetDate) {
+
         // 1. 만약 프론트에서 date를 안 보내줬다면(null), 오늘 날짜를 기본값으로 잡음
         LocalDate baseDate = (targetDate != null) ? targetDate : LocalDate.now();
         LocalDateTime startDateTime;
@@ -88,21 +90,58 @@ public class ScheduleService {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
-        // 3. 계산된 기간으로 DB 조회
-        return scheduleRepository.findSchedulesWithinRange(targetUserId, startDateTime, endDateTime);
+        List<Schedule> originalSchedules = scheduleRepository.findSchedulesWithinRange(targetUserId, startDateTime, endDateTime);
+        List<EventDto> resultDtos = new ArrayList<>();
+
+        // 원본 일정을 순회하며 주간/월간 뷰에 맞게 일정을 복제
+        for (Schedule schedule : originalSchedules) {
+            LocalDateTime currentStart = schedule.getStartTime();
+            LocalDateTime currentEnd = schedule.getEndTime();
+
+            if (schedule.getRepeatType() == RepeatType.NONE) {
+                // 단건 일정
+                if (!currentStart.isAfter(endDateTime) && !currentEnd.isBefore(startDateTime)) {
+                    resultDtos.add(EventDto.from(schedule, loginUserId));
+                }
+            } else {
+                // 반복 일정: 현재 계산하는 일정이 프론트가 요청한 기간을 벗어날 때까지 계속 더해가며 복제
+                while (!currentStart.isAfter(endDateTime)) {
+
+                    if (!currentEnd.isBefore(startDateTime)) {
+                        resultDtos.add(EventDto.fromExpanded(schedule, loginUserId, currentStart, currentEnd));
+                    }
+
+                    // 다음 일정 시간으로 점프 (WEEKLY면 1주일 뒤로 이동)
+                    switch (schedule.getRepeatType()) {
+                        case DAILY -> {
+                            currentStart = currentStart.plusDays(1);
+                            currentEnd = currentEnd.plusDays(1);
+                        }
+                        case WEEKLY -> {
+                            currentStart = currentStart.plusWeeks(1);
+                            currentEnd = currentEnd.plusWeeks(1);
+                        }
+                        case MONTHLY -> {
+                            currentStart = currentStart.plusMonths(1);
+                            currentEnd = currentEnd.plusMonths(1);
+                        }
+                        default -> {
+                            throw new CustomException(ErrorCode.INVALID_INPUT);
+                        }
+                    }
+                }
+            }
+        }
+        return resultDtos;
     }
+
+
 
     // 자기 자신 일정 조회
     @Transactional(readOnly = true)
     public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
 
-        List<Schedule> schedules = fetchSchedules(userId, view, targetDate);
-
-        // DTO 변환 후 반환
-        List<EventDto> eventDtos = schedules.stream()
-                .map(schedule -> EventDto.from(schedule, userId))
-                .collect(Collectors.toList());
-
+        List<EventDto> eventDtos = getExpandedEventDtos(userId, userId, view, targetDate);
         return ScheduleResponseDto.from(eventDtos);
     }
 
@@ -125,13 +164,7 @@ public class ScheduleService {
             //throw new CustomException(ErrorCode.FRIEND_FORBIDDEN);
         }
 
-        List<Schedule> friendSchedules = fetchSchedules(friendId, view, targetDate);
-
-        List<EventDto> eventDtos = friendSchedules.stream()
-                // myUserId를 넘겨주면 EventDto 내부에서 주인이 다름을 감지하고 마스킹(true)
-                .map(schedule -> EventDto.from(schedule, myUserId))
-                .collect(Collectors.toList());
-
+        List<EventDto> eventDtos = getExpandedEventDtos(friendId, myUserId, view, targetDate);
         return ScheduleResponseDto.from(eventDtos);
     }
 
