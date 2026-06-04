@@ -71,7 +71,7 @@ public class CategoryController {
     @DeleteMapping("/{category_id}")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(
             @AuthenticationPrincipal Long userId,
-            @PathVariable Long categoryId
+            @PathVariable("category_id") Long categoryId
     ) {
         // 1. 서비스 로직 호출 (마이그레이션 + 삭제 진행)
         categoryService.deleteCategory(categoryId, userId);
