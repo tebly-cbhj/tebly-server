@@ -100,6 +100,6 @@ public class FriendService {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
-        return scheduleService.getSchedules(friendId, view, targetDate);
+        return scheduleService.getFriendSchedules(userId, friendId, view, targetDate);
     }
 }
