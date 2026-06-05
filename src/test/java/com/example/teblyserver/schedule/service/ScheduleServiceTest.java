@@ -3,6 +3,7 @@ package com.example.teblyserver.schedule.service;
 import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
+import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.RepeatType;
 import com.example.teblyserver.schedule.domain.Schedule;
 import com.example.teblyserver.schedule.dto.request.ScheduleUpdateRequestDto;
@@ -46,7 +47,18 @@ class ScheduleServiceTest {
         // 가짜 일정 객체 생성
         User user = new User();
         ReflectionTestUtils.setField(user, "id", userId);
-        Schedule mockSchedule = Schedule.create(user, "테스트 일정", LocalDateTime.now(), LocalDateTime.now(), RepeatType.NONE);
+
+        Category category = Category.createCustom(user, "전공수업", "book_icon_url", false);
+        ReflectionTestUtils.setField(category, "id", 100L);
+
+        Schedule mockSchedule = Schedule.create(
+                user,
+                category,
+                "테스트 일정",
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                RepeatType.NONE
+        );
 
         given(scheduleRepository.findSchedulesWithinRange(eq(userId), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .willReturn(List.of(mockSchedule));
@@ -59,6 +71,10 @@ class ScheduleServiceTest {
 
         assertThat(response.events()).hasSize(1);
         assertThat(response.events().get(0).title()).isEqualTo("테스트 일정");
+
+        assertThat(response.events().get(0).category().categoryId()).isEqualTo(100L);
+        assertThat(response.events().get(0).category().categoryName()).isEqualTo("전공수업");
+        assertThat(response.events().get(0).category().isPrivate()).isFalse();
     }
 
 
@@ -74,11 +90,29 @@ class ScheduleServiceTest {
         User owner = new User();
         ReflectionTestUtils.setField(owner, "id", scheduleOwnerId);
 
-        Schedule mockSchedule = Schedule.create(owner, "진짜 주인의 일정", LocalDateTime.now(), LocalDateTime.now(), RepeatType.NONE);
+        Category category = Category.createCustom(owner, "기존 카테고리", "default_icon", false);
+
+        // DB가 생성해주는 PK(id) 값만 리플렉션으로 주입
+        ReflectionTestUtils.setField(category, "id", 10L);
+
+        Schedule mockSchedule = Schedule.create(
+                owner,
+                category,
+                "진짜 주인의 일정",
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                RepeatType.NONE
+        );
 
         given(scheduleRepository.findById(scheduleId)).willReturn(Optional.of(mockSchedule));
 
-        ScheduleUpdateRequestDto requestDto = new ScheduleUpdateRequestDto("해킹 시도", LocalDateTime.now(), LocalDateTime.now(), RepeatType.NONE);
+        ScheduleUpdateRequestDto requestDto = new ScheduleUpdateRequestDto(
+                null, // 카테고리는 그대로 둘게~ 하고 요청하는 상황 가정
+                "해킹 시도",
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                RepeatType.NONE
+        );
 
         // When & Then (실행 및 검증)
         // 1번 유저(loginUserId)가 100번 일정을 수정하려고 하면 403 에러가 터져야 성공
