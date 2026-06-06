@@ -27,6 +27,10 @@ public class ScheduleOcrConfirmRequest {
     @Schema(description = "일정 단건")
     public static class ScheduleItem {
 
+        @NotNull(message = "카테고리는 필수입니다.")
+        @Schema(description = "프론트에서 최종 선택한 카테고리 ID", example = "1")
+        private Long categoryId;
+
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "일정 제목", example = "프로그래밍언어")
         private String title;

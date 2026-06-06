@@ -1,5 +1,6 @@
 package com.example.teblyserver.schedule.dto;
 
+import com.example.teblyserver.schedule.domain.OcrCategoryType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,4 +21,7 @@ public class OcrScheduleItem {
 
     @Schema(description = "강의명 또는 일정 제목", example = "자료구조")
     private final String title;
+
+    @Schema(description = "텍스트 기반 추정 카테고리 (LECTURE/WORK/ETC)", example = "LECTURE")
+    private final OcrCategoryType categoryType;
 }

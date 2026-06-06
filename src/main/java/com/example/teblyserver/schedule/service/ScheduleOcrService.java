@@ -6,11 +6,14 @@ import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.schedule.client.ClovaOcrClient;
 import com.example.teblyserver.schedule.client.dto.ClovaOcrApiResponse;
+import com.example.teblyserver.schedule.domain.Category;
+import com.example.teblyserver.schedule.domain.OcrCategoryType;
 import com.example.teblyserver.schedule.domain.Schedule;
 import com.example.teblyserver.schedule.dto.OcrScheduleItem;
 import com.example.teblyserver.schedule.dto.ScheduleOcrResponse;
 import com.example.teblyserver.schedule.dto.request.ScheduleOcrConfirmRequest;
 import com.example.teblyserver.schedule.dto.response.ScheduleOcrConfirmResponse;
+import com.example.teblyserver.schedule.repository.CategoryRepository;
 import com.example.teblyserver.schedule.repository.ScheduleRepository;
 import com.example.teblyserver.schedule.util.ImageBlockDetector;
 import com.example.teblyserver.schedule.util.ImageBlockDetector.DetectedBlock;
@@ -25,6 +28,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -46,9 +50,20 @@ public class ScheduleOcrService {
         put("THU", "THU"); put("FRI", "FRI"); put("SAT", "SAT"); put("SUN", "SUN");
     }};
 
+    // 알바·근로 추정 키워드 (공백 제거한 블록 텍스트에 하나라도 포함되면 WORK)
+    private static final Set<String> WORK_KEYWORDS = Set.of(
+            "알바", "근로", "근무", "출근", "교내근로", "교외근로", "조교", "인턴", "TA"
+    );
+
+    // 강의실 패턴: 건물명(2~8자) + 선택적 영문 + 호실(3~5자리 숫자)
+    // 예) 백마관304, 형설관 B201, 조만식기념관 12317, (공)504
+    private static final Pattern LECTURE_ROOM_PATTERN =
+            Pattern.compile("[가-힣A-Za-z()]{2,8}\\s?[A-Za-z]?\\d{3,5}");
+
     private final ClovaOcrClient clovaOcrClient;
     private final UserRepository userRepository;
     private final ScheduleRepository scheduleRepository;
+    private final CategoryRepository categoryRepository;
 
     // ── 공개 API ─────────────────────────────────────────────────────────────
 
@@ -115,12 +130,21 @@ public class ScheduleOcrService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         List<Schedule> schedules = request.getSchedules().stream()
-                .map(item -> Schedule.create(
-                        user,
-                        item.getTitle(),
-                        item.getStartTime(),
-                        item.getEndTime(),
-                        item.getRepeatType()))
+                .map(item -> {
+                    // 프론트가 최종 선택한 카테고리를 조회 후 소유자 검증 → 그대로 저장
+                    Category category = categoryRepository.findById(item.getCategoryId())
+                            .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
+                    if (!category.getUser().getId().equals(userId)) {
+                        throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN);
+                    }
+                    return Schedule.create(
+                            user,
+                            category,
+                            item.getTitle(),
+                            item.getStartTime(),
+                            item.getEndTime(),
+                            item.getRepeatType());
+                })
                 .collect(Collectors.toList());
 
         List<Schedule> saved = scheduleRepository.saveAll(schedules);
@@ -260,19 +284,23 @@ public class ScheduleOcrService {
                             block.getDayOfWeek(), block.getStartTime(), block.getEndTime());
                 }
 
+                // 분류는 강의실·교수명까지 포함한 블록 전체 텍스트로 추정 (title 조립과 별개)
+                OcrCategoryType categoryType = classifyBlock(blockFields);
+
                 result.add(OcrScheduleItem.builder()
                         .dayOfWeek(resolveDay(block.getDayOfWeek()))
                         .startTime(normalizeTime(block.getStartTime()))
                         .endTime(normalizeTime(block.getEndTime()))
                         .title(title)
+                        .categoryType(categoryType)
                         .build());
 
                 String mappedTexts = blockFields.stream()
                         .map(f -> f.getInferText().trim())
                         .collect(Collectors.joining("|"));
-                log.info("[OCR-DIAG] 블록→일정: {} {}~{} title='{}' (매핑필드 {}개: {})",
+                log.info("[OCR-DIAG] 블록→일정: {} {}~{} title='{}' category={} (매핑필드 {}개: {})",
                         block.getDayOfWeek(), block.getStartTime(), block.getEndTime(),
-                        title, blockFields.size(), mappedTexts);
+                        title, categoryType, blockFields.size(), mappedTexts);
             }
 
         } catch (Exception e) {
@@ -316,6 +344,41 @@ public class ScheduleOcrService {
                 .filter(f -> Math.abs(fieldCenterY(f) - firstY) <= threshold)
                 .map(f -> f.getInferText().trim())
                 .collect(Collectors.joining());
+    }
+
+    // ── 카테고리 추정 ────────────────────────────────────────────────────────
+
+    /**
+     * 블록 전체 텍스트(강의실·교수명 포함)를 기반으로 카테고리를 추정합니다.
+     * title 조립(buildTitleByFirstGroup)과 달리 첫 그룹만이 아닌 blockFields 전부를 사용합니다.
+     *
+     * <ol>
+     *   <li>텍스트가 비어있으면 ETC</li>
+     *   <li>알바/근로 키워드가 하나라도 포함되면 WORK</li>
+     *   <li>강의실 패턴(건물명+호실)이 매칭되면 LECTURE</li>
+     *   <li>그 외에는 기본값 LECTURE (에타 시간표 특성상 강의일 확률이 가장 높음)</li>
+     * </ol>
+     */
+    private OcrCategoryType classifyBlock(List<ClovaOcrApiResponse.Field> blockFields) {
+        // 1) 블록 전체 텍스트 (공백 join)
+        String text = blockFields.stream()
+                .map(f -> f.getInferText() == null ? "" : f.getInferText().trim())
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.joining(" "));
+
+        if (text.isBlank()) return OcrCategoryType.ETC;
+
+        // 2) 알바·근로 키워드 (공백 제거 후 부분 일치)
+        String compact = text.replaceAll("\\s+", "");
+        for (String keyword : WORK_KEYWORDS) {
+            if (compact.contains(keyword)) return OcrCategoryType.WORK;
+        }
+
+        // 3) 강의실 패턴 매칭 → 강의
+        if (LECTURE_ROOM_PATTERN.matcher(text).find()) return OcrCategoryType.LECTURE;
+
+        // 4) 분류 불명 블록은 강의로 기본 처리
+        return OcrCategoryType.LECTURE;
     }
 
     // ── OCR 필드 추출 헬퍼 ──────────────────────────────────────────────────
