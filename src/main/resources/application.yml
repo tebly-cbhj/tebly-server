@@ -25,7 +25,7 @@ spring:
             user-name-attribute: id
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/mydb
+    url: jdbc:postgresql://db:5432/mydb
     username: myuser
     password: mypassword
     driver-class-name: org.postgresql.Driver
