@@ -52,6 +52,17 @@ public class User {
         user.oauthId = oauthId;
         user.nickname = nickname;
         user.profileImageUrl = profileImageUrl;
+        user.invitationCode = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         return user;
+    }
+
+    public void softDelete() {
+        this.isDeleted = true;
+    }
+
+    public void updateProfile(String nickname, String profileImageUrl) {
+        if (nickname != null) this.nickname = nickname;
+        if (profileImageUrl != null) this.profileImageUrl = profileImageUrl;
+        this.isNewUser = false;
     }
 }

@@ -1,7 +1,5 @@
 package com.example.teblyserver.schedule.dto.response;
-
 import java.util.List;
-
 public record ScheduleResponseDto(
         List<EventDto> events
 ) {

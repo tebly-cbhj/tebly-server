@@ -1,0 +1,21 @@
+package com.example.teblyserver.auth.dto;
+
+import com.example.teblyserver.auth.domain.User;
+import lombok.Getter;
+
+@Getter
+public class UserProfileResponse {
+    private Long id;
+    private String email;
+    private String nickname;
+    private String profileImageUrl;
+    private boolean isNewUser;
+
+    public UserProfileResponse(User user) {
+        this.id = user.getId();
+        this.email = user.getEmail();
+        this.nickname = user.getNickname();
+        this.profileImageUrl = user.getProfileImageUrl();
+        this.isNewUser = user.isNewUser();
+    }
+}

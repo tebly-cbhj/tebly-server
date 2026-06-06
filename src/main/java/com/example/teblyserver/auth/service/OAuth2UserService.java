@@ -3,11 +3,13 @@ package com.example.teblyserver.auth.service;
 import com.example.teblyserver.auth.domain.Provider;
 import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.UserRepository;
+import com.example.teblyserver.schedule.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
@@ -16,8 +18,10 @@ import java.util.Map;
 public class OAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
+    private final CategoryService categoryService;
 
     @Override
+    @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) {
         OAuth2User oAuth2User = super.loadUser(userRequest);
 
@@ -47,9 +51,13 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         }
 
         User user = userRepository.findByOauthId(oauthId)
-                .orElseGet(() -> userRepository.save(
-                        User.create(email, provider, oauthId, nickname, profileImageUrl)
-                ));
+                .orElseGet(() -> {
+                    User newUser = userRepository.save(
+                            User.create(email, provider, oauthId, nickname, profileImageUrl)
+                    );
+                    categoryService.createDefaultCategories(newUser);
+                    return newUser;
+                });
 
         return oAuth2User;
     }
