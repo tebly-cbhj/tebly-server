@@ -44,10 +44,9 @@ public class RoomController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<RoomListResponse>>> getRooms(
-            @AuthenticationPrincipal Long userId,
-            @RequestParam(defaultValue = "joined") String type
+            @AuthenticationPrincipal Long userId
     ) {
-        List<RoomListResponse> response = roomService.getRooms(userId, type);
+        List<RoomListResponse> response = roomService.getRooms(userId, "joined");
 
         return ResponseEntity.ok(ApiResponse.success("방 목록 조회 성공", response));
     }
