@@ -143,7 +143,8 @@ public class ScheduleOcrService {
                             item.getTitle(),
                             item.getStartTime(),
                             item.getEndTime(),
-                            item.getRepeatType());
+                            item.getRepeatType(),
+                            null);
                 })
                 .collect(Collectors.toList());
 

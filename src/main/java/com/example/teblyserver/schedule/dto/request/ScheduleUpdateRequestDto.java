@@ -17,5 +17,8 @@ public record ScheduleUpdateRequestDto(
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
         LocalDateTime endTime,
         @JsonProperty("repeat_type")
-        RepeatType repeatType
+        RepeatType repeatType,
+
+        @JsonProperty("notification_lead_minutes")
+        Integer notificationLeadMinutes
 ) {}
