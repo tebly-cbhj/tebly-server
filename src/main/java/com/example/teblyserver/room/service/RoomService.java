@@ -4,6 +4,8 @@ import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.UserRepository;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
+import com.example.teblyserver.notification.domain.NotificationType;
+import com.example.teblyserver.notification.service.NotificationService;
 import com.example.teblyserver.room.domain.InviteStatus;
 import com.example.teblyserver.room.domain.Room;
 import com.example.teblyserver.room.domain.RoomMember;
@@ -28,6 +30,7 @@ public class RoomService {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     private final RoomMemberRepository roomMemberRepository;
+    private final NotificationService notificationService;
 
     /**
      * 방 생성 및 멤버 초대 로직
@@ -56,6 +59,14 @@ public class RoomService {
 
             for (User invitee : invitees) {
                 RoomMember.create(room, invitee, RoomRole.MEMBER, InviteStatus.PENDING);
+                // 초대 알림 발송
+                notificationService.send(
+                        invitee,
+                        NotificationType.INVITATION,
+                        "방 초대",
+                        room.getName() + "에 초대되었어요!",
+                        "/rooms/" + room.getId()
+                );
             }
         }
 
