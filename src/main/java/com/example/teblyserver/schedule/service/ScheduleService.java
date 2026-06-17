@@ -60,7 +60,8 @@ public class ScheduleService {
                 requestDto.title(),
                 requestDto.startTime(),
                 requestDto.endTime(),
-                requestDto.repeatType()
+                requestDto.repeatType(),
+                requestDto.notificationLeadMinutes()
         );
 
         // 4. Repository를 통해 DB에 최종 저장
@@ -196,7 +197,7 @@ public class ScheduleService {
 
 
         // 4. 엔티티의 값을 변경
-        schedule.update(category, dto.title(), dto.startTime(), dto.endTime(), dto.repeatType());
+        schedule.update(category, dto.title(), dto.startTime(), dto.endTime(), dto.repeatType(), dto.notificationLeadMinutes());
 
         // 별도로 repository.save()를 하지 않아도 됨, @Transactional 덕분에 Dirty-checking
         return schedule.getId();

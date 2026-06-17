@@ -32,8 +32,6 @@ public class Schedule {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    // 🔗 [이번에 추가된 꿀필드!] OCR 인식 기록 연관관계 (1 : N)
-    // 이미지로 생성된 일정이 아닐 수도 있으므로 nullable = true(기본값)로 둡니다.
     // TODO: OcrLog 엔티티 구현 후 주석 해제 예정
     // @ManyToOne(fetch = FetchType.LAZY)
     // @JoinColumn(name = "ocr_log_id", nullable = true)
@@ -52,6 +50,9 @@ public class Schedule {
     @Enumerated(EnumType.STRING)
     private RepeatType repeatType = RepeatType.NONE; // ERD의 기본값 'NONE' 반영
 
+    @Column
+    private Integer notificationLeadMinutes; // 5분 : 5, 10분 : 10, 1시간 : 60, 1일전 : 1440 등
+
     @Column(nullable = false)
     private boolean isDeleted = false;
 
@@ -64,7 +65,7 @@ public class Schedule {
     private LocalDateTime updatedAt;
 
     // 정적 팩토리 메서드 업데이트 (OCR 로그 없이 생성할 때)
-    public static Schedule create(User user, Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
+    public static Schedule create(User user, Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType, Integer notificationLeadMinutes) {
         Schedule schedule = new Schedule();
         schedule.user = user;
         schedule.category = category;
@@ -72,6 +73,7 @@ public class Schedule {
         schedule.startTime = startTime;
         schedule.endTime = endTime;
         schedule.repeatType = repeatType;
+        schedule.notificationLeadMinutes = notificationLeadMinutes;
         return schedule;
     }
 
@@ -82,7 +84,7 @@ public class Schedule {
     //     return schedule;
     // }
 
-    public void update(Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType) {
+    public void update(Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType, Integer notificationLeadMinutes) {
         if (category != null) {
             this.category = category; // 일정 수정 시 카테고리 수정 가능
         }
@@ -98,9 +100,18 @@ public class Schedule {
         if (repeatType != null) {
             this.repeatType = repeatType;
         }
+        this.notificationLeadMinutes = notificationLeadMinutes;
     }
 
     public void delete() {
         this.isDeleted = true;
+    }
+
+    // 알림이 울려야 하는 실제 시각 을 직접 계산해 주는 비즈니스 메서드를 제공
+    public LocalDateTime getCalculatedNotificationTime() {
+        if (this.notificationLeadMinutes == null) {
+            return null;
+        }
+        return this.startTime.minusMinutes(this.notificationLeadMinutes);
     }
 }
