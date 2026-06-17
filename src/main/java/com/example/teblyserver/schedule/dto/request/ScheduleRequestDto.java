@@ -28,5 +28,8 @@ public record ScheduleRequestDto(
 
         @NotNull(message = "반복 타입은 필수입니다.")
         @JsonProperty("repeat_type")
-        RepeatType repeatType
+        RepeatType repeatType,
+
+        @JsonProperty("notification_lead_minutes")
+        Integer notificationLeadMinutes
 ) {}
