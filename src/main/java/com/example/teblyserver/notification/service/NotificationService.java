@@ -1,6 +1,8 @@
 package com.example.teblyserver.notification.service;
 
 import com.example.teblyserver.auth.domain.User;
+import com.example.teblyserver.common.exception.CustomException;
+import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.notification.domain.Notification;
 import com.example.teblyserver.notification.domain.NotificationType;
 import com.example.teblyserver.notification.repository.NotificationRepository;
@@ -41,10 +43,11 @@ public class NotificationService {
         return notificationRepository.findByUserIdAndTypeNotOrderByCreatedAtDesc(userId, NotificationType.INVITATION);
     }
 
-    // 전체 읽음 처리
+    // 개별 읽음 처리
     @Transactional
-    public void markAsRead(Long userId) {
-        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalse(userId);
-        notifications.forEach(Notification::markAsRead);
+    public void markAsRead(Long notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOTIFICATION_NOT_FOUND));
+        notification.markAsRead();
     }
 }

@@ -33,12 +33,10 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.getCommonNotifications(userId));
     }
 
-    // 일반 알림 읽음 처리
-    @PatchMapping("/common/read")
-    public ResponseEntity<Void> markAsRead(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
-        notificationService.markAsRead(userId);
+    // 개별 읽음 처리
+    @PatchMapping("/common/{id}/read")
+    public ResponseEntity<Void> markAsRead(@PathVariable Long id) {
+        notificationService.markAsRead(id);
         return ResponseEntity.ok().build();
     }
 }
