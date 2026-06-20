@@ -27,6 +27,12 @@ public enum ErrorCode {
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "ROOM_404_1", "존재하지 않는 방입니다."),
     ROOM_FORBIDDEN(HttpStatus.FORBIDDEN, "ROOM_403_1", "해당 방에 접근할 권한이 없습니다."),
 
+    // chat - 4xx
+    CHAT_ROOM_MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "CHAT_403_1", "해당 채팅방에 속한 멤버가 아닙니다."),
+    CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_404_1", "존재하지 않는 메시지입니다."),
+
+    // notification - 4xx
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404_1", "존재하지 않는 알림입니다."),
 
     // OCR - 5xx
     OCR_API_CALL_FAILED(HttpStatus.BAD_GATEWAY, "OCR_502_1", "OCR API 호출에 실패했습니다."),

@@ -39,4 +39,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("targetCategory") Category targetCategory,
             @Param("defaultCategory") Category defaultCategory
     );
+
+    // 알림 보낼 시간 된 일정 조회
+    @Query("SELECT s FROM Schedule s " +
+            "JOIN FETCH s.user u " +
+            "WHERE s.notificationLeadMinutes IS NOT NULL " +
+            "AND FUNCTION('TIMESTAMPDIFF', MINUTE, CURRENT_TIMESTAMP, s.startTime) = s.notificationLeadMinutes")
+    List<Schedule> findSchedulesToNotify();
 }
