@@ -26,6 +26,7 @@ public enum ErrorCode {
     // room - 4xx
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "ROOM_404_1", "존재하지 않는 방입니다."),
     ROOM_FORBIDDEN(HttpStatus.FORBIDDEN, "ROOM_403_1", "해당 방에 접근할 권한이 없습니다."),
+    HOST_CANNOT_LEAVE_ROOM(HttpStatus.BAD_REQUEST, "ROOM_400_1", "방장은 방을 나갈 수 없습니다."),
 
     PROMISE_NOT_FOUND(HttpStatus.NOT_FOUND, "PROMISE_404_1", "존재하지 않는 약속입니다."),
     PROMISE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_1", "해당 약속을 생성할 권한이 없습니다."),
