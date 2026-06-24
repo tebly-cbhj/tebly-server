@@ -177,15 +177,18 @@ public class PromiseService {
                 request.minDuration()
         );
 
-        Category category = categoryRepository.findById(request.categoryId())
-                .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
+        Category category = promise.getCategory();
+        if (request.categoryId() != null) {
+            category = categoryRepository.findById(request.categoryId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
 
-        if (!category.getUser().getId().equals(userId)) {
-            throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN);
-        }
+            if (!category.getUser().getId().equals(userId)) {
+                throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN);
+            }
 
-        if (!category.isDefault()) {
-            throw new CustomException(ErrorCode.INVALID_PROMISE_CATEGORY);
+            if (!category.isDefault()) {
+                throw new CustomException(ErrorCode.INVALID_PROMISE_CATEGORY);
+            }
         }
 
         // 약속 시간이 바뀌었는지 먼저 확인
