@@ -16,7 +16,8 @@ public record RoomPromiseResponse(
         LocalDate proposeStartDate,
         LocalDate proposeEndDate,
 
-        LocalDateTime confirmedTime,
+        LocalDateTime startTime,
+        LocalDateTime endTime,
         String location,
 
         PromiseStatus promiseStatus,
@@ -51,7 +52,8 @@ public record RoomPromiseResponse(
                 promise.getProposeStartDate(),
                 promise.getProposeEndDate(),
 
-                promise.getConfirmedTime(),
+                promise.getStartTime(),
+                promise.getEndTime(),
                 promise.getLocation(),
 
                 promise.getStatus(),

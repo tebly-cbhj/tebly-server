@@ -4,6 +4,8 @@ import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.UserRepository;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
+import com.example.teblyserver.promise.domain.Promise;
+import com.example.teblyserver.promise.domain.PromiseMemberStatus;
 import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.RepeatType;
 import com.example.teblyserver.schedule.domain.Schedule;
@@ -217,5 +219,42 @@ public class ScheduleService {
 
         // 3. soft-delete 수행 (상태값만 true로 변경)
         schedule.delete();
+    }
+
+
+    /**
+     * 약속 확정 시,
+     * 약속을 수락한 멤버들의 개인 일정에 자동 등록
+     */
+    @Transactional
+    public void addPromiseSchedules(Promise promise) {
+
+        // 생성자가 약속 생성 시 선택한 카테고리 이름
+        String promiseCategoryName = promise.getCategory().getName();
+
+        List<Schedule> schedules = promise.getMembers().stream()
+                // 참석으로 응답한 멤버만 일정 등록
+                .filter(member -> member.getStatus() == PromiseMemberStatus.ACCEPTED)
+                .map(member -> {
+                    User user = member.getUser();
+
+                    // 각 유저의 기본 카테고리 중, 생성자가 선택한 카테고리와 이름이 같은 카테고리를 찾음
+                    Category memberCategory = categoryRepository
+                            .findByUserIdAndNameAndIsDefaultTrue(user.getId(), promiseCategoryName)
+                            .orElseThrow(() -> new CustomException(ErrorCode.DEFAULT_CATEGORY_MISSING));
+
+                    return Schedule.create(
+                            user,
+                            memberCategory,
+                            promise.getTitle(),
+                            promise.getStartTime(),
+                            promise.getEndTime(),
+                            RepeatType.NONE,
+                            promise.getNotificationLeadMinutes()
+                    );
+                })
+                .toList();
+
+        scheduleRepository.saveAll(schedules);
     }
 }

@@ -28,8 +28,16 @@ public enum ErrorCode {
     ROOM_FORBIDDEN(HttpStatus.FORBIDDEN, "ROOM_403_1", "해당 방에 접근할 권한이 없습니다."),
     HOST_CANNOT_LEAVE_ROOM(HttpStatus.BAD_REQUEST, "ROOM_400_1", "방장은 방을 나갈 수 없습니다."),
 
+    PROMISE_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "PROMISE_400_1", "이미 확정되었거나 취소된 약속입니다."),
+    INVALID_PROMISE_TIME(HttpStatus.BAD_REQUEST, "PROMISE_400_2","약속 시간이 올바르지 않습니다."),
+    INVALID_PROMISE_DURATION(HttpStatus.BAD_REQUEST, "PROMISE_400_3", "약속 시간이 최소 시간보다 짧습니다."),
+    INVALID_PROMISE_CATEGORY(HttpStatus.BAD_REQUEST, "PROMISE_400_4","약속 카테고리는 기본 카테고리 중에서 선택해야 합니다."),
+    PROMISE_MEMBER_NOT_PENDING(HttpStatus.BAD_REQUEST, "PROMISE_400_5","미응답 상태인 멤버만 콕찌르기 할 수 있습니다."),
+    PROMISE_POKE_ALREADY_SENT(HttpStatus.BAD_REQUEST, "PROMISE_400_6","오늘 이미 해당 멤버에게 콕찌르기를 보냈습니다."),
+    CANNOT_POKE_SELF(HttpStatus.BAD_REQUEST, "PROMISE_400_7","자기 자신에게는 콕찌르기를 보낼 수 없습니다."),
     PROMISE_NOT_FOUND(HttpStatus.NOT_FOUND, "PROMISE_404_1", "존재하지 않는 약속입니다."),
-    PROMISE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_1", "해당 약속을 생성할 권한이 없습니다."),
+    PROMISE_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "PROMISE_404_2","해당 약속에 포함되지 않은 멤버입니다."),
+    PROMISE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_1", "해당 약속의 권한이 없습니다."),
 
 
     // OCR - 5xx

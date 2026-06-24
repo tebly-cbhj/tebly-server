@@ -12,10 +12,15 @@ public record RoomDetailResponse(
         String description,
         String imageUrl,
         int totalMemberCount,
-        List<String> memberProfileImages // 동그란 프로필 사진 렌더링용 URL 리스트 (최대 3개)
+        List<String> memberProfileImages, // 동그란 프로필 사진 렌더링용 URL 리스트 (최대 3개)
+
+        List<RoomPromiseResponse> myPromises,
+        List<RoomPromiseResponse> invitedPromises
 ) {
 
-    public static RoomDetailResponse of(Room room) {
+    public static RoomDetailResponse of(Room room,
+                                        List<RoomPromiseResponse> myPromises,
+                                        List<RoomPromiseResponse> invitedPromises) {
         // 1. 방에 속한 멤버 중 '초대 수락(ACCEPTED)' 상태인 진짜 멤버들만 필터링
         List<RoomMember> acceptedMembers = room.getMembers().stream()
                 .filter(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED)
@@ -32,8 +37,11 @@ public record RoomDetailResponse(
                 room.getName(),
                 room.getDescription(),
                 room.getImageUrl(),
-                acceptedMembers.size(), // 진짜 멤버 총인원수
-                profileImages
+                acceptedMembers.size(),
+                // 진짜 멤버 총인원수
+                profileImages,
+                myPromises,
+                invitedPromises
         );
     }
 }

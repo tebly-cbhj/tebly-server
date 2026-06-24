@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public record PromiseCreateRequest(
+public record PromiseUpdateRequest(
         @NotBlank(message = "약속 이름은 필수입니다.")
         @Size(max = 50, message = "약속 이름은 50자를 넘을 수 없습니다.")
         String title,
@@ -16,7 +16,6 @@ public record PromiseCreateRequest(
         @Size(max = 255, message = "메모는 255자를 넘을 수 없습니다.")
         String comment,
 
-        @NotNull(message = "카테고리는 필수입니다.")
         Long categoryId,
 
         @NotNull(message = "조율 시작일은 필수입니다.")

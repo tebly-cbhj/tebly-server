@@ -15,7 +15,7 @@ public record PromiseDetailResponse(
         Long roomId,
         String roomName,
 
-        Long categoryId,
+        Long myCategoryId,
         String categoryName,
 
         String title,
@@ -24,8 +24,11 @@ public record PromiseDetailResponse(
         LocalDate proposeStartDate,
         LocalDate proposeEndDate,
 
-        LocalDateTime confirmedTime,
+        LocalDateTime startTime,
+        LocalDateTime endTime,
+
         String location,
+        Integer notificationLeadMinutes,
 
         PromiseStatus status,
         Integer minDuration,
@@ -44,11 +47,11 @@ public record PromiseDetailResponse(
     /**
      * Promise 엔티티를 PromiseDetailResponse DTO로 변환하는 정적 메서드
      *
-     * @param promise 조회한 약속 엔티티
+     * @param promise     조회한 약속 엔티티
      * @param loginUserId 현재 로그인한 사용자 ID
      * @return 약속 상세 조회 응답 DTO
      */
-    public static PromiseDetailResponse from(Promise promise, Long loginUserId) {
+    public static PromiseDetailResponse from(Promise promise, Long loginUserId, Long myCategoryId) {
 
         // 약속에 참여하는 멤버 목록
         List<PromiseMember> promiseMembers = promise.getMembers();
@@ -89,8 +92,8 @@ public record PromiseDetailResponse(
                 promise.getRoom().getId(),
                 promise.getRoom().getName(),
 
-                promise.getCategory() == null ? null : promise.getCategory().getId(),
-                promise.getCategory() == null ? null : promise.getCategory().getName(),
+                myCategoryId,
+                promise.getCategory().getName(),
 
                 promise.getTitle(),
                 promise.getComment(),
@@ -98,8 +101,10 @@ public record PromiseDetailResponse(
                 promise.getProposeStartDate(),
                 promise.getProposeEndDate(),
 
-                promise.getConfirmedTime(),
+                promise.getStartTime(),
+                promise.getEndTime(),
                 promise.getLocation(),
+                promise.getNotificationLeadMinutes(),
 
                 promise.getStatus(),
                 promise.getMinDuration(),
