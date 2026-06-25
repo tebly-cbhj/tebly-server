@@ -57,7 +57,8 @@ class ScheduleServiceTest {
                 "테스트 일정",
                 LocalDateTime.now(),
                 LocalDateTime.now(),
-                RepeatType.NONE
+                RepeatType.NONE,
+                10
         );
 
         given(scheduleRepository.findSchedulesWithinRange(eq(userId), any(LocalDateTime.class), any(LocalDateTime.class)))
@@ -101,7 +102,8 @@ class ScheduleServiceTest {
                 "진짜 주인의 일정",
                 LocalDateTime.now(),
                 LocalDateTime.now(),
-                RepeatType.NONE
+                RepeatType.NONE,
+                10
         );
 
         given(scheduleRepository.findById(scheduleId)).willReturn(Optional.of(mockSchedule));
@@ -111,7 +113,8 @@ class ScheduleServiceTest {
                 "해킹 시도",
                 LocalDateTime.now(),
                 LocalDateTime.now(),
-                RepeatType.NONE
+                RepeatType.NONE,
+                10
         );
 
         // When & Then (실행 및 검증)

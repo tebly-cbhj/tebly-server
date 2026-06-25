@@ -1,5 +1,6 @@
 package com.example.teblyserver.schedule.repository;
 
+import com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange;
 import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.Schedule;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,5 +39,34 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     int migrateCategory(
             @Param("targetCategory") Category targetCategory,
             @Param("defaultCategory") Category defaultCategory
+    );
+
+    // 추천 탐색 범위와 조금이라도 겹치는 일정을 가져오겠다는 쿼리
+    @Query("""
+        select new com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange(
+            s.user.id,
+            s.startTime,
+            s.endTime,
+            s.repeatType
+        )
+        from Schedule s
+        where s.user.id in :userIds
+          and (
+                (
+                    s.repeatType = com.example.teblyserver.schedule.domain.RepeatType.NONE
+                    and s.startTime < :endDateTime
+                    and s.endTime > :startDateTime
+                )
+                or
+                (
+                    s.repeatType <> com.example.teblyserver.schedule.domain.RepeatType.NONE
+                    and s.startTime < :endDateTime
+                )
+          )
+        """)
+    List<BusyScheduleTimeRange> findBusySchedulesByUserIdsAndPeriod(
+            @Param("userIds") List<Long> userIds,
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime") LocalDateTime endDateTime
     );
 }
