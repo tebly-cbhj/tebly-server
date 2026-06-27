@@ -11,9 +11,12 @@ import com.example.teblyserver.room.domain.Room;
 import com.example.teblyserver.room.domain.RoomMember;
 import com.example.teblyserver.room.domain.RoomRole;
 import com.example.teblyserver.room.dto.request.RoomCreateRequest;
+import com.example.teblyserver.room.dto.request.RoomMemberInviteRequest;
+import com.example.teblyserver.room.dto.request.RoomMemberKickRequest;
 import com.example.teblyserver.room.dto.request.RoomUpdateRequest;
 import com.example.teblyserver.room.dto.response.RoomDetailResponse;
 import com.example.teblyserver.room.dto.response.RoomListResponse;
+import com.example.teblyserver.room.dto.response.RoomMemberResponse;
 import com.example.teblyserver.room.repository.RoomMemberRepository;
 import com.example.teblyserver.room.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -155,5 +158,107 @@ public class RoomService {
         }
 
         room.delete();
+    }
+
+    /**
+     * 방 멤버 목록 조회 (ACCEPTED 멤버만)
+     */
+    public List<RoomMemberResponse> getMembers(Long userId, Long roomId) {
+
+        roomRepository.findById(roomId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
+
+        boolean isMember = roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
+                .stream()
+                .anyMatch(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED);
+
+        if (!isMember) {
+            throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
+        }
+
+        return roomMemberRepository.findByRoomIdAndInviteStatusAndIsDeletedFalse(roomId, InviteStatus.ACCEPTED)
+                .stream()
+                .map(RoomMemberResponse::of)
+                .toList();
+    }
+
+    /**
+     * 멤버 초대 (PENDING 레코드 생성)
+     */
+    @Transactional
+    public void inviteMembers(Long userId, Long roomId, RoomMemberInviteRequest request) {
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
+
+        boolean isHost = roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
+                .stream()
+                .anyMatch(rm -> rm.getRole() == RoomRole.HOST);
+
+        if (!isHost) {
+            throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
+        }
+
+        List<User> invitees = userRepository.findAllById(request.userIds());
+
+        for (User invitee : invitees) {
+            List<RoomMember> existing = roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, invitee.getId());
+
+            boolean alreadyActive = existing.stream()
+                    .anyMatch(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED || rm.getInviteStatus() == InviteStatus.PENDING);
+
+            if (!alreadyActive) {
+                RoomMember.create(room, invitee, RoomRole.MEMBER, InviteStatus.PENDING);
+            }
+        }
+    }
+
+    /**
+     * 멤버 강퇴 (Soft Delete)
+     */
+    @Transactional
+    public void kickMembers(Long userId, Long roomId, RoomMemberKickRequest request) {
+
+        roomRepository.findById(roomId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
+
+        boolean isHost = roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
+                .stream()
+                .anyMatch(rm -> rm.getRole() == RoomRole.HOST);
+
+        if (!isHost) {
+            throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
+        }
+
+        for (Long targetUserId : request.userIds()) {
+            if (targetUserId.equals(userId)) {
+                continue;
+            }
+
+            roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, targetUserId)
+                    .forEach(RoomMember::delete);
+        }
+    }
+
+    /**
+     * 방 나가기 (본인 Soft Delete)
+     */
+    @Transactional
+    public void leaveRoom(Long userId, Long roomId) {
+
+        roomRepository.findById(roomId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
+
+        RoomMember member = roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
+                .stream()
+                .filter(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED)
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_FORBIDDEN));
+
+        if (member.getRole() == RoomRole.HOST) {
+            throw new CustomException(ErrorCode.HOST_CANNOT_LEAVE_ROOM);
+        }
+
+        member.delete();
     }
 }
