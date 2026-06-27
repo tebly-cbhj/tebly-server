@@ -56,6 +56,9 @@ public class Schedule {
     @Column(nullable = false)
     private boolean isDeleted = false;
 
+    @Column
+    private LocalDateTime lastNotifiedAt; // 마지막으로 알림을 보낸 시각 (반복 일정 중복 알림 방지용)
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -105,6 +108,10 @@ public class Schedule {
 
     public void delete() {
         this.isDeleted = true;
+    }
+
+    public void updateLastNotifiedAt(LocalDateTime notifiedAt) {
+        this.lastNotifiedAt = notifiedAt;
     }
 
     // 알림이 울려야 하는 실제 시각 을 직접 계산해 주는 비즈니스 메서드를 제공

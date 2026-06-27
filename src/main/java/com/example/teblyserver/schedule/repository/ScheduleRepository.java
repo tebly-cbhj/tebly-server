@@ -32,6 +32,18 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("endDateTime") LocalDateTime endDateTime
     );
 
+    // 알림 후보 일정 조회 (앞으로 24시간 내 시작하는, 아직 오늘 알림 안 보낸 일정)
+    @Query("SELECT s FROM Schedule s " +
+            "JOIN FETCH s.user u " +
+            "WHERE s.isDeleted = false " +
+            "AND s.notificationLeadMinutes IS NOT NULL " +
+            "AND s.startTime BETWEEN :now AND :within24h " +
+            "AND (s.lastNotifiedAt IS NULL OR s.lastNotifiedAt < :todayStart)")
+    List<Schedule> findNotificationCandidates(
+            @Param("now") LocalDateTime now,
+            @Param("within24h") LocalDateTime within24h,
+            @Param("todayStart") LocalDateTime todayStart
+    );
     // 타겟 카테고리를 가진 모든 일정을 기본 카테고리로 일괄 업데이트
     @Modifying(clearAutomatically = true) // 벌크 연산 후 영속성 컨텍스트(캐시)를 비워주는 필수 옵션
     @Query("UPDATE Schedule s SET s.category = :defaultCategory WHERE s.category = :targetCategory")
