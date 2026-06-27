@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 @Table(name = "room_member")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("is_deleted = false")
 public class RoomMember {
 
     @Id
@@ -46,8 +48,7 @@ public class RoomMember {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(nullable = false)
-    @JoinColumn(name = "is_deleted", nullable = false)
+    @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 
     // 정적 팩토리 메서드 (객체 생성과 동시에 양방향 연관관계 세팅)
