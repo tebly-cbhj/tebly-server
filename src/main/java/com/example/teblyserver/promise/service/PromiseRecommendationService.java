@@ -2,6 +2,11 @@ package com.example.teblyserver.promise.service;
 
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
+import com.example.teblyserver.decision.dto.CandidateSlotDto;
+import com.example.teblyserver.decision.dto.DecisionCacheDto;
+import com.example.teblyserver.decision.dto.MemberAvailabilityDto;
+import com.example.teblyserver.decision.dto.MemberSummaryDto;
+import com.example.teblyserver.decision.service.DecisionCacheService;
 import com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendRequest;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendationSortType;
@@ -33,6 +38,7 @@ public class PromiseRecommendationService {
 
     private final RoomRepository roomRepository;
     private final ScheduleRepository scheduleRepository;
+    private final DecisionCacheService decisionCacheService;
 
     public List<PromiseTimeRecommendationResponse> recommendPromiseTimes(
             Long userId,
@@ -155,9 +161,74 @@ public class PromiseRecommendationService {
         }
 
 // 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
-        return candidatePool.stream()
+        List<PromiseTimeRecommendationResponse> finalRecommendations = candidatePool.stream()
                 .sorted(getFinalRecommendationComparator(request.sortType()))
                 .limit(RESPONSE_RECOMMENDATION_COUNT)
+                .toList();
+
+        // 6. 알고리즘 결과를 Redis에 캐싱 → 결정 도우미(LLM) API에서 roomId로 꺼내 사용
+        cacheDecisionResult(roomId, request, finalRecommendations);
+
+        return finalRecommendations;
+    }
+
+    // 추천 결과를 결정 도우미용 캐시(DecisionCacheDto)로 변환해 Redis에 저장
+    private void cacheDecisionResult(
+            Long roomId,
+            PromiseTimeRecommendRequest request,
+            List<PromiseTimeRecommendationResponse> finalRecommendations
+    ) {
+        boolean noCandidate = finalRecommendations.isEmpty();
+
+        List<CandidateSlotDto> candidates = toCandidateSlots(finalRecommendations);
+
+        // TODO: noCandidate=true 시 memberAvailability 구성 필요
+        //       (현재 알고리즘에서 멤버별 freeRanges 직접 추출이 어려워 일단 빈 리스트로 저장)
+        List<MemberAvailabilityDto> memberAvailability = noCandidate ? List.of() : null;
+
+        DecisionCacheDto cacheDto = new DecisionCacheDto(
+                noCandidate,
+                candidates,
+                memberAvailability,
+                request.proposeStartDate(),
+                request.proposeEndDate()
+        );
+
+        decisionCacheService.saveDecisionCache(roomId, cacheDto);
+    }
+
+    // PromiseTimeRecommendationResponse → CandidateSlotDto 변환 (slotId는 순서대로 "slot-N" 부여)
+    private List<CandidateSlotDto> toCandidateSlots(
+            List<PromiseTimeRecommendationResponse> recommendations
+    ) {
+        List<CandidateSlotDto> candidateSlots = new ArrayList<>();
+
+        for (int i = 0; i < recommendations.size(); i++) {
+            PromiseTimeRecommendationResponse recommendation = recommendations.get(i);
+
+            candidateSlots.add(
+                    new CandidateSlotDto(
+                            "slot-" + (i + 1),
+                            recommendation.startTime(),
+                            recommendation.endTime(),
+                            recommendation.durationMinutes(),
+                            recommendation.allAvailable(),
+                            recommendation.availableMemberCount(),
+                            recommendation.totalMemberCount(),
+                            toMemberSummaries(recommendation.availableMembers()),
+                            toMemberSummaries(recommendation.unavailableMembers())
+                    )
+            );
+        }
+
+        return candidateSlots;
+    }
+
+    private List<MemberSummaryDto> toMemberSummaries(
+            List<PromiseRecommendationMemberResponse> members
+    ) {
+        return members.stream()
+                .map(member -> new MemberSummaryDto(member.nickname()))
                 .toList();
     }
 
