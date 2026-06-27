@@ -55,8 +55,8 @@ class ScheduleServiceTest {
                 user,
                 category,
                 "테스트 일정",
-                LocalDateTime.now(),
-                LocalDateTime.now(),
+                LocalDateTime.of(2026, 5, 27, 10, 0),
+                LocalDateTime.of(2026, 5, 27, 11, 0),
                 RepeatType.NONE,
                 10
         );

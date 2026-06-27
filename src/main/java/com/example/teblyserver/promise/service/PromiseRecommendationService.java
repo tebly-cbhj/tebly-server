@@ -5,6 +5,7 @@ import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendRequest;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendationSortType;
+import com.example.teblyserver.promise.dto.response.PromiseRecommendationMemberResponse;
 import com.example.teblyserver.promise.dto.response.PromiseTimeRecommendationResponse;
 import com.example.teblyserver.room.domain.InviteStatus;
 import com.example.teblyserver.room.domain.Room;
@@ -69,6 +70,13 @@ public class PromiseRecommendationService {
 
         int totalMemberCount = memberIds.size(); // 방 멤버 수
 
+        List<PromiseRecommendationMemberResponse> memberResponses = acceptedMembers.stream()
+                .map(member -> new PromiseRecommendationMemberResponse(
+                        member.getUser().getId(),
+                        member.getUser().getNickname(),        // [주의] User 엔티티 필드명에 맞게 수정
+                        member.getUser().getProfileImageUrl()  // [주의] 없으면 DTO에서도 제거
+                ))
+                .toList();
 
         // request로 넘어온 시작 날짜, 끝 날짜, 시간대를 바탕으로 LocalDateTime 만듦
         // TODO: 만약 searchStartTime과 searchEndTime이 request를 타고 넘어오는 것이 아니라면 helper 메서드를 만들어서 생성해줘야될듯
@@ -91,36 +99,133 @@ public class PromiseRecommendationService {
                         searchPeriodEnd
                 );
 
-        List<PromiseTimeRecommendationResponse> candidates = new ArrayList<>(); // 추천 빈 시간을 담을 리스트
+        // 1. 전원 가능 후보 먼저 수집
+        List<PromiseTimeRecommendationResponse> allAvailableCandidates =
+                collectAllAvailableCandidates(
+                        request,
+                        memberIds,
+                        busySchedules,
+                        totalMemberCount,
+                        now,
+                        memberResponses
+                );
+
+// 2. 최종 정렬에 사용할 후보군
+        List<PromiseTimeRecommendationResponse> candidatePool = new ArrayList<>();
+
+// 3. 전원 가능 후보를 먼저 후보군에 넣는다.
+//    단, MAX_CANDIDATE_COUNT를 넘기지 않도록 제한한다.
+        for (PromiseTimeRecommendationResponse candidate : allAvailableCandidates) {
+            if (candidatePool.size() >= MAX_CANDIDATE_COUNT) {
+                break;
+            }
+
+            candidatePool.add(candidate);
+        }
+
+// 4. 전원 가능 후보가 전혀 없다면 충돌 최소 후보를 수집하여 추가한다.
+        if (candidatePool.size() < MAX_CANDIDATE_COUNT) {
+            List<PromiseTimeRecommendationResponse> leastConflictCandidates =
+                    collectLeastConflictCandidates(
+                            request,
+                            memberIds,
+                            busySchedules,
+                            totalMemberCount,
+                            now,
+                            memberResponses
+                    );
+
+            for (PromiseTimeRecommendationResponse candidate : leastConflictCandidates) {
+                if (candidatePool.size() >= MAX_CANDIDATE_COUNT) {
+                    break;
+                }
+
+                // 전원 가능 후보는 제외
+                if (candidate.allAvailable()) {
+                    continue;
+                }
+
+                // 같은 startTime/endTime이 이미 있으면 중복 제거
+                if (isDuplicateTimeRange(candidate, candidatePool)) {
+                    continue;
+                }
+
+                candidatePool.add(candidate);
+            }
+        }
+
+// 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
+        return candidatePool.stream()
+                .sorted(getFinalRecommendationComparator(request.sortType()))
+                .limit(RESPONSE_RECOMMENDATION_COUNT)
+                .toList();
+    }
+
+
+    // 전체 추천 기간에서 "멤버 전원 가능 후보"를 수집하는 메서드
+    private List<PromiseTimeRecommendationResponse> collectAllAvailableCandidates(
+            PromiseTimeRecommendRequest request,
+            List<Long> memberIds,
+            List<BusyScheduleTimeRange> busySchedules,
+            int totalMemberCount,
+            LocalDateTime now,
+            List<PromiseRecommendationMemberResponse> memberResponses
+    ) {
+        List<PromiseTimeRecommendationResponse> candidates = new ArrayList<>();
 
         LocalDate currentDate = request.proposeStartDate();
 
-
         while (!currentDate.isAfter(request.proposeEndDate())) {
-            List<PromiseTimeRecommendationResponse> dailyRecommendations =
+            candidates.addAll(
                     findDailyRecommendations(
                             currentDate,
                             request,
                             memberIds,
                             busySchedules,
                             totalMemberCount,
-                            now
-                    );
-
-            candidates.addAll(dailyRecommendations);
-
-            if (candidates.size() >= MAX_CANDIDATE_COUNT) {
-                break;
-            }
+                            now,
+                            memberResponses
+                    )
+            );
 
             currentDate = currentDate.plusDays(1);
         }
 
-        return candidates.stream()
-                .sorted(getRecommendationComparator(request.sortType()))
-                .limit(RESPONSE_RECOMMENDATION_COUNT)
-                .toList();
+        return candidates;
     }
+
+    // 전체 추천 기간에서 "충돌 최소 후보"를 수집하는 메서드
+    private List<PromiseTimeRecommendationResponse> collectLeastConflictCandidates(
+            PromiseTimeRecommendRequest request,
+            List<Long> memberIds,
+            List<BusyScheduleTimeRange> busySchedules,
+            int totalMemberCount,
+            LocalDateTime now,
+            List<PromiseRecommendationMemberResponse> memberResponses
+    ) {
+        List<PromiseTimeRecommendationResponse> candidates = new ArrayList<>();
+
+        LocalDate currentDate = request.proposeStartDate();
+
+        while (!currentDate.isAfter(request.proposeEndDate())) {
+            candidates.addAll(
+                    findDailyLeastConflictRecommendations(
+                            currentDate,
+                            request,
+                            memberIds,
+                            busySchedules,
+                            totalMemberCount,
+                            now,
+                            memberResponses
+                    )
+            );
+
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return candidates;
+    }
+
 
 
     private List<PromiseTimeRecommendationResponse> findDailyRecommendations(
@@ -129,7 +234,8 @@ public class PromiseRecommendationService {
             List<Long> memberIds,
             List<BusyScheduleTimeRange> busySchedules,
             int totalMemberCount,
-            LocalDateTime now
+            LocalDateTime now,
+            List<PromiseRecommendationMemberResponse> memberResponses
     ) {
         // 과거 날짜면 추천하지 않음
         if (date.isBefore(now.toLocalDate())) {
@@ -197,9 +303,82 @@ public class PromiseRecommendationService {
                 daySearchStart,
                 blockCount,
                 requiredBlockCount,
-                totalMemberCount
+                totalMemberCount,
+                memberResponses
         );
     }
+
+    // “전원 가능한 시간”이 없을 때 사용할
+    // 충돌 최소 추천 후보를 만드는 메서드
+    // findDailyRecommendations와 거의 유사 - 마지막 return 호출 메서드만 다름
+    private List<PromiseTimeRecommendationResponse> findDailyLeastConflictRecommendations(
+            LocalDate date,
+            PromiseTimeRecommendRequest request,
+            List<Long> memberIds,
+            List<BusyScheduleTimeRange> busySchedules,
+            int totalMemberCount,
+            LocalDateTime now,
+            List<PromiseRecommendationMemberResponse> memberResponses
+    ) {
+        if (date.isBefore(now.toLocalDate())) {
+            return List.of();
+        }
+
+        LocalDateTime daySearchStart = date.atTime(request.searchStartTime());
+        LocalDateTime daySearchEnd = date.atTime(request.searchEndTime());
+
+        if (date.isEqual(now.toLocalDate())) {
+            LocalDateTime roundedNow = roundToNextSlot(now);
+
+            if (roundedNow.isAfter(daySearchStart)) {
+                daySearchStart = roundedNow;
+            }
+        }
+
+        if (!daySearchEnd.isAfter(daySearchStart)) {
+            return List.of();
+        }
+
+        long searchWindowMinutes = Duration.between(daySearchStart, daySearchEnd).toMinutes();
+        int blockCount = (int) (searchWindowMinutes / SLOT_MINUTES);
+
+        int requiredBlockCount = ceilDiv(request.minDuration(), SLOT_MINUTES);
+
+        if (blockCount < requiredBlockCount) {
+            return List.of();
+        }
+
+        boolean[][] busy = new boolean[totalMemberCount][blockCount];
+
+        Map<Long, Integer> memberIndexMap = createMemberIndexMap(memberIds);
+
+        List<BusyScheduleTimeRange> expandedBusySchedules =
+                expandBusySchedulesForDate(
+                        busySchedules,
+                        date,
+                        daySearchStart,
+                        daySearchEnd
+                );
+
+        markBusyBlocks(
+                busy,
+                memberIndexMap,
+                expandedBusySchedules,
+                daySearchStart,
+                daySearchEnd,
+                blockCount
+        );
+
+        return collectLeastConflictTimeRanges(
+                busy,
+                daySearchStart,
+                blockCount,
+                requiredBlockCount,
+                totalMemberCount,
+                memberResponses
+        );
+    }
+
 
     // 현재 시간을 다음 30분 단위로 올림 처리
     // 예를 들어 지금이 18:07이면 18:30부터 추천
@@ -394,7 +573,7 @@ public class PromiseRecommendationService {
                 startOffsetMinutes = 60 -> 일정이 탐색 시작 시간인 09:00으로부터 60분 뒤에 시작한다
                 endOffsetMinutes = 150 -> 일정이 탐색 시작 시간인 09:00으로부터 150분 뒤에 끝난다
              */
-    long startOffsetMinutes = Duration.between(daySearchStart, overlapStart).toMinutes();
+            long startOffsetMinutes = Duration.between(daySearchStart, overlapStart).toMinutes();
             long endOffsetMinutes = Duration.between(daySearchStart, overlapEnd).toMinutes();
 
             // 위에서 구한 startOffsetMinutes, endOffsetMinutes를 가지고 busy block으로 칠할 범위를 구함
@@ -415,6 +594,7 @@ public class PromiseRecommendationService {
         }
     }
 
+
     /*
         busy 배열을 처음부터 끝까지 훑으면서
         멤버 전원이 비어 있는 시간이 연속으로 이어지는 구간을 찾아
@@ -425,7 +605,8 @@ public class PromiseRecommendationService {
             LocalDateTime daySearchStart,
             int blockCount,
             int requiredBlockCount,
-            int totalMemberCount
+            int totalMemberCount,
+            List<PromiseRecommendationMemberResponse> memberResponses
     ) {
         List<PromiseTimeRecommendationResponse> recommendations = new ArrayList<>();
 
@@ -467,7 +648,10 @@ public class PromiseRecommendationService {
                                     durationMinutes,
                                     totalMemberCount,
                                     totalMemberCount,
-                                    "멤버 전원 가능한 시간"
+                                    true,
+                                    "멤버 전원 가능한 시간",
+                                    memberResponses, // [추가] 전원 가능이므로 전체 멤버
+                                    List.of()
                             )
                     );
                 }
@@ -495,27 +679,370 @@ public class PromiseRecommendationService {
         return true;
     }
 
-    private Comparator<PromiseTimeRecommendationResponse> getRecommendationComparator(
+
+    /*
+        모든 멤버가 가능한 시간이 없을 때,
+        minDuration 길이만큼 시간창을 30분씩 밀어보면서
+        가장 많은 멤버가 참석 가능한 시간대를 후보로 만드는 메서드
+     */
+    /*
+    [수정]
+    기존 방식:
+        minDuration 길이만큼만 충돌 최소 후보를 반환했음.
+        예: 14:00~16:00 / 2명 가능
+
+    수정 방식:
+        1. 먼저 minDuration 구간에서 가능한 멤버 집합을 구함
+        2. 그 멤버들이 계속 가능한 만큼 오른쪽으로 구간을 확장함
+        3. 더 큰 후보에 포함되는 작은 후보는 제거함
+
+    예:
+        A, D가 14:00~17:00 전체 가능하고 minDuration이 2시간이면
+
+        기존:
+            14:00~16:00 / 2명 가능
+            14:30~16:30 / 2명 가능
+            15:00~17:00 / 2명 가능
+
+        수정 후:
+            14:00~17:00 / 2명 가능
+*/
+    private List<PromiseTimeRecommendationResponse> collectLeastConflictTimeRanges(
+            boolean[][] busy,
+            LocalDateTime daySearchStart,
+            int blockCount,
+            int requiredBlockCount,
+            int totalMemberCount,
+            List<PromiseRecommendationMemberResponse> memberResponses
+    ) {
+        // 가능한 멤버 집합까지 들고 있는 내부 후보를 먼저 만든다.
+        List<LeastConflictCandidate> rawCandidates = new ArrayList<>();
+
+        for (int startBlock = 0; startBlock <= blockCount - requiredBlockCount; startBlock++) {
+
+        /*
+            startBlock부터 minDuration 길이만큼 봤을 때,
+            그 구간 전체에 참석 가능한 멤버들의 index를 구한다.
+
+            예:
+                14:00~16:00 기준
+                A 가능, B 불가능, C 불가능, D 가능
+
+                availableMembers = [A, D]
+        */
+            Set<Integer> availableMembers = getAvailableMemberIndexesForRange(
+                    busy,
+                    startBlock,
+                    requiredBlockCount,
+                    totalMemberCount
+            );
+
+            if (availableMembers.isEmpty()) {
+                continue;
+            }
+
+        /*
+            처음에는 최소 길이만큼만 후보 구간을 잡는다.
+
+            예:
+                startBlock = 14:00
+                requiredBlockCount = 4칸
+                candidateEndBlockExclusive = 16:00
+        */
+            int candidateEndBlockExclusive = startBlock + requiredBlockCount;
+
+        /*
+            minDuration 구간에서 가능했던 멤버들이
+            다음 블록에서도 계속 가능하면 후보 구간을 확장한다.
+
+            예:
+                availableMembers = [A, D]
+
+                16:00~16:30에도 A, D 가능하면 확장
+                16:30~17:00에도 A, D 가능하면 확장
+
+                최종 후보: 14:00~17:00
+        */
+            while (candidateEndBlockExclusive < blockCount
+                    && areMembersFreeAtBlock(busy, availableMembers, candidateEndBlockExclusive)) {
+                candidateEndBlockExclusive++;
+            }
+
+            LocalDateTime startTime =
+                    daySearchStart.plusMinutes((long) startBlock * SLOT_MINUTES);
+
+            LocalDateTime endTime =
+                    daySearchStart.plusMinutes((long) candidateEndBlockExclusive * SLOT_MINUTES);
+
+            int durationMinutes =
+                    (int) Duration.between(startTime, endTime).toMinutes();
+
+            rawCandidates.add(
+                    new LeastConflictCandidate(
+                            startTime,
+                            endTime,
+                            durationMinutes,
+                            Set.copyOf(availableMembers),
+                            totalMemberCount
+                    )
+            );
+        }
+        /*
+        [추가]
+        더 큰 후보에 포함되는 작은 후보 제거.
+
+        예:
+            14:00~17:00 / A,D 가능
+            14:30~17:00 / A,D 가능
+            15:00~17:00 / A,D 가능
+
+        이 경우 뒤의 두 개는 14:00~17:00 안에 포함되므로 제거.
+    */
+        List<LeastConflictCandidate> filteredCandidates =
+                removeDominatedLeastConflictCandidates(rawCandidates);
+
+        // [수정] 내부 후보를 최종 응답 DTO로 변환
+        return filteredCandidates.stream()
+                .map(candidate -> candidate.toResponse(memberResponses))
+                .toList();
+    }
+
+
+    /*
+    특정 구간 전체에 참석 가능한 멤버들의 index를 구하는 메서드.
+
+    기존 countAvailableMembersForRange()는 "몇 명 가능한지"만 반환했지만,
+    이제는 후보 포함 관계를 판단하기 위해 "누가 가능한지"도 필요하다.
+*/
+    private Set<Integer> getAvailableMemberIndexesForRange(
+            boolean[][] busy,
+            int startBlock,
+            int requiredBlockCount,
+            int totalMemberCount
+    ) {
+        Set<Integer> availableMembers = new HashSet<>();
+
+        for (int member = 0; member < totalMemberCount; member++) {
+            if (isMemberFreeForRange(busy, member, startBlock, requiredBlockCount)) {
+                availableMembers.add(member);
+            }
+        }
+
+        return availableMembers;
+    }
+
+    /*
+        이미 가능한 멤버 집합이 다음 block에서도 모두 가능한지 확인하는 메서드.
+
+        예:
+            availableMembers = [A, D]
+            block = 16:00~16:30
+
+            A가 이 블록에 바쁘면 false
+            D가 이 블록에 바쁘면 false
+            둘 다 안 바쁘면 true
+
+        true면 후보 구간을 오른쪽으로 확장할 수 있다.
+    */
+    private boolean areMembersFreeAtBlock(
+            boolean[][] busy,
+            Set<Integer> members,
+            int block
+    ) {
+        for (Integer member : members) {
+            if (busy[member][block]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    // 이 멤버가 이 추천 구간 전체에서 비어 있는가?
+    private int countAvailableMembersForRange(
+            boolean[][] busy,
+            int startBlock,
+            int requiredBlockCount,
+            int totalMemberCount
+    ) {
+        int availableMemberCount = 0;
+
+        for (int member = 0; member < totalMemberCount; member++) {
+            if (isMemberFreeForRange(busy, member, startBlock, requiredBlockCount)) {
+                availableMemberCount++;
+            }
+        }
+
+        return availableMemberCount;
+    }
+
+    // 한 멤버가 구간 전체에서 가능한지 확인
+    private boolean isMemberFreeForRange(
+            boolean[][] busy,
+            int member,
+            int startBlock,
+            int requiredBlockCount
+    ) {
+        for (int block = startBlock; block < startBlock + requiredBlockCount; block++) {
+            if (busy[member][block]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    /*
+    더 큰 후보에 포함되는 작은 충돌 최소 후보를 제거
+    제거 기준:
+        1. other가 candidate의 시간 범위를 완전히 포함하고
+        2. other의 가능 멤버 집합이 candidate의 가능 멤버 집합을 모두 포함하고
+        3. other가 candidate보다 실제로 더 넓거나 더 많은 멤버를 포함하면
+    candidate는 제거 가능
+    예:
+        other     = 14:00~17:00 / A,D 가능
+        candidate = 14:30~17:00 / A,D 가능
+
+        other가 candidate를 포함하고,
+        가능한 멤버도 같으므로 candidate 제거.
+    */
+    private List<LeastConflictCandidate> removeDominatedLeastConflictCandidates(
+            List<LeastConflictCandidate> candidates
+    ) {
+        List<LeastConflictCandidate> result = new ArrayList<>();
+
+        for (LeastConflictCandidate candidate : candidates) {
+            boolean dominated = candidates.stream()
+                    .anyMatch(other ->
+                            other != candidate
+                                    && containsTimeRange(other, candidate)
+                                    && other.availableMembers().containsAll(candidate.availableMembers())
+                                    && isStrictlyBetterOrWider(other, candidate)
+                    );
+
+            if (!dominated) {
+                result.add(candidate);
+            }
+        }
+
+        return result;
+    }
+
+    /*
+        outer가 inner의 시간 범위를 완전히 포함하는지 확인한다.
+        예:
+            outer = 14:00~17:00
+            inner = 14:30~17:00
+            outer.startTime <= inner.startTime
+            outer.endTime >= inner.endTime
+            따라서 true.
+    */
+    private boolean containsTimeRange(
+            LeastConflictCandidate outer,
+            LeastConflictCandidate inner
+    ) {
+        return !outer.startTime().isAfter(inner.startTime())
+                && !outer.endTime().isBefore(inner.endTime());
+    }
+
+    /*
+        완전히 같은 후보끼리 서로 제거되는 것을 막기 위한 메서드.
+        other가 candidate보다
+            - 더 일찍 시작하거나
+            - 더 늦게 끝나거나
+
+        other가 더 낫거나 더 넓은 후보라고 판단한다.
+    */
+    private boolean isStrictlyBetterOrWider(
+            LeastConflictCandidate other,
+            LeastConflictCandidate candidate
+    ) {
+        boolean startsEarlier = other.startTime().isBefore(candidate.startTime());
+        boolean endsLater = other.endTime().isAfter(candidate.endTime());
+        boolean hasMoreAvailableMembers =
+                other.availableMemberCount() > candidate.availableMemberCount();
+
+        return startsEarlier || endsLater || hasMoreAvailableMembers;
+    }
+
+    // 추천 reason 메서드
+    private String buildRecommendationReason(
+            int availableMemberCount,
+            int totalMemberCount
+    ) {
+        if (availableMemberCount == totalMemberCount) {
+            return "멤버 전원 가능한 시간";
+        }
+
+        return "일정 충돌이 가장 적은 시간";
+    }
+
+
+    // 같은 시간대가 후보군에 중복으로 들어가는 것을 막는 메서드
+    private boolean isDuplicateTimeRange(
+            PromiseTimeRecommendationResponse candidate,
+            List<PromiseTimeRecommendationResponse> existingCandidates
+    ) {
+        return existingCandidates.stream()
+                .anyMatch(existing ->
+                        existing.startTime().equals(candidate.startTime())
+                                && existing.endTime().equals(candidate.endTime())
+                );
+    }
+
+
+// 추천 후보군에는 전원 가능 후보와 충돌 최소 후보가 섞여 있을 수 있다.
+// 따라서 정렬 시 availableMemberCount도 보조 기준으로 넣어준다.
+    private Comparator<PromiseTimeRecommendationResponse> getFinalRecommendationComparator(
             PromiseTimeRecommendationSortType sortType
     ) {
-        // 변경: sortType이 null이면 기본값은 빠른 시간순
         PromiseTimeRecommendationSortType effectiveSortType =
                 sortType == null ? PromiseTimeRecommendationSortType.EARLIEST : sortType;
 
-        // 변경: 프론트가 보낸 정렬 조건에 따라 다른 정렬 기준 적용
         return switch (effectiveSortType) {
             // 빠른 시간순
-            case EARLIEST -> Comparator.comparing(PromiseTimeRecommendationResponse::startTime);
+            // 시간이 같으면 가능한 멤버 수가 많은 후보 우선
+            // 그래도 같으면 더 긴 후보 우선
+            case EARLIEST -> Comparator
+                    .comparing(PromiseTimeRecommendationResponse::startTime)
+                    .thenComparing(
+                            PromiseTimeRecommendationResponse::availableMemberCount,
+                            Comparator.reverseOrder()
+                    )
+                    .thenComparing(
+                            PromiseTimeRecommendationResponse::durationMinutes,
+                            Comparator.reverseOrder()
+                    );
 
             // 늦은 시간순
-            case LATEST -> Comparator.comparing(PromiseTimeRecommendationResponse::startTime)
-                    .reversed();
+            // 사용자가 늦은 시간을 선호하면, 충돌이 조금 있는 후보도 위로 올라올 수 있음
+            case LATEST -> Comparator
+                    .comparing(PromiseTimeRecommendationResponse::startTime)
+                    .reversed()
+                    .thenComparing(
+                            PromiseTimeRecommendationResponse::availableMemberCount,
+                            Comparator.reverseOrder()
+                    )
+                    .thenComparing(
+                            PromiseTimeRecommendationResponse::durationMinutes,
+                            Comparator.reverseOrder()
+                    );
 
             // 긴 시간순
-            // 시간이 긴 후보를 먼저 보여주고,
-            // 길이가 같으면 시작 시간이 빠른 순으로 정렬
-            case LONGEST -> Comparator.comparing(PromiseTimeRecommendationResponse::durationMinutes)
-                    .reversed()
+            // 긴 가능 구간을 먼저 보여주고,
+            // 길이가 같으면 가능한 멤버 수가 많은 후보 우선
+            // 그래도 같으면 빠른 시간순
+            case LONGEST -> Comparator
+                    .comparing(
+                            PromiseTimeRecommendationResponse::durationMinutes,
+                            Comparator.reverseOrder()
+                    )
+                    .thenComparing(
+                            PromiseTimeRecommendationResponse::availableMemberCount,
+                            Comparator.reverseOrder()
+                    )
                     .thenComparing(PromiseTimeRecommendationResponse::startTime);
         };
     }
@@ -543,7 +1070,11 @@ public class PromiseRecommendationService {
         }
 
         if (request.searchStartTime().getMinute() % SLOT_MINUTES != 0
-                || request.searchEndTime().getMinute() % SLOT_MINUTES != 0) {
+                || request.searchEndTime().getMinute() % SLOT_MINUTES != 0
+                || request.searchStartTime().getSecond() != 0
+                || request.searchStartTime().getNano() != 0
+                || request.searchEndTime().getSecond() != 0
+                || request.searchEndTime().getNano() != 0) {
             throw new CustomException(ErrorCode.INVALID_PROMISE_TIME);
         }
     }
@@ -559,4 +1090,54 @@ public class PromiseRecommendationService {
     private int ceilDiv(long value, int divisor) {
         return (int) ((value + divisor - 1) / divisor);
     }
+
+
+    private record LeastConflictCandidate(
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            int durationMinutes,
+            Set<Integer> availableMembers,
+            int totalMemberCount
+    ) {
+        int availableMemberCount() {
+            return availableMembers.size();
+        }
+
+        // [수정] memberResponses를 파라미터로 받도록 변경
+        PromiseTimeRecommendationResponse toResponse(
+                List<PromiseRecommendationMemberResponse> memberResponses
+        ) {
+            List<PromiseRecommendationMemberResponse> availableMemberResponses = new ArrayList<>();
+            List<PromiseRecommendationMemberResponse> unavailableMemberResponses = new ArrayList<>();
+
+            // [추가]
+            // availableMembers는 배열 index 집합이다.
+            // 전체 memberResponses를 돌면서 index가 포함되어 있으면 가능,
+            // 포함되어 있지 않으면 불가능으로 분리한다.
+            for (int i = 0; i < memberResponses.size(); i++) {
+                if (availableMembers.contains(i)) {
+                    availableMemberResponses.add(memberResponses.get(i));
+                } else {
+                    unavailableMemberResponses.add(memberResponses.get(i));
+                }
+            }
+
+            return new PromiseTimeRecommendationResponse(
+                    startTime,
+                    endTime,
+                    durationMinutes,
+                    availableMemberCount(),
+                    totalMemberCount,
+                    availableMemberCount() == totalMemberCount,
+                    availableMemberCount() == totalMemberCount
+                            ? "멤버 전원 가능한 시간"
+                            : "일정 충돌이 가장 적은 시간",
+                    availableMemberResponses,   // [추가]
+                    unavailableMemberResponses  // [추가]
+            );
+        }
+    }
 }
+
+
+
