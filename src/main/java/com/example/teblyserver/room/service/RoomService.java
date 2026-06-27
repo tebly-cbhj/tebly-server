@@ -5,6 +5,8 @@ import com.example.teblyserver.auth.repository.UserRepository;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.notification.domain.NotificationType;
+import com.example.teblyserver.promise.domain.Promise;
+import com.example.teblyserver.promise.repository.PromiseRepository;
 import com.example.teblyserver.notification.service.NotificationService;
 import com.example.teblyserver.room.domain.InviteStatus;
 import com.example.teblyserver.room.domain.Room;
@@ -17,6 +19,7 @@ import com.example.teblyserver.room.dto.request.RoomUpdateRequest;
 import com.example.teblyserver.room.dto.response.RoomDetailResponse;
 import com.example.teblyserver.room.dto.response.RoomListResponse;
 import com.example.teblyserver.room.dto.response.RoomMemberResponse;
+import com.example.teblyserver.room.dto.response.RoomPromiseResponse;
 import com.example.teblyserver.room.repository.RoomMemberRepository;
 import com.example.teblyserver.room.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,7 @@ public class RoomService {
     private final UserRepository userRepository;
     private final RoomMemberRepository roomMemberRepository;
     private final NotificationService notificationService;
+    private final PromiseRepository promiseRepository;
 
     /**
      * 방 생성 및 멤버 초대 로직
@@ -95,7 +99,8 @@ public class RoomService {
     }
 
     /**
-     * 방 상세 정보 조회 (기획 화면 상단부)
+     * 방 상세 정보 조회
+     * 상단 방 정보 + 하단 내 약속/초대받은 약속 목록까지 함께 반환
      */
     public RoomDetailResponse getRoomDetail(Long userId, Long roomId) {
 
@@ -111,9 +116,25 @@ public class RoomService {
             throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
         }
 
+        // 3. 방 상세 하단의 '내 약속' 목록 조회
+        List<Promise> myPromises = promiseRepository.findMyPromisesInRoom(roomId, userId);
+
+        // 4. 방 상세 하단의 '초대 받은 약속' 목록 조회
+        List<Promise> invitedPromises = promiseRepository.findInvitedPromisesInRoom(roomId, userId);
+
+        // 5. 약속 엔티티를 방 상세 약속 카드 DTO로 변환
+        List<RoomPromiseResponse> myPromiseResponses = myPromises.stream()
+                .map(promise -> RoomPromiseResponse.of(promise, userId))
+                .toList();
+
+        List<RoomPromiseResponse> invitedPromiseResponses = invitedPromises.stream()
+                .map(promise -> RoomPromiseResponse.of(promise, userId))
+                .toList();
+
         // 3. 엔티티를 화면 맞춤형 DTO로 변환하여 반환
-        return RoomDetailResponse.of(room);
+        return RoomDetailResponse.of(room, myPromiseResponses, invitedPromiseResponses);
     }
+
 
     /**
      * 방 정보 수정
