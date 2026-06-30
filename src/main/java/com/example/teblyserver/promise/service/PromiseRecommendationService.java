@@ -63,18 +63,24 @@ public class PromiseRecommendationService {
             throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
         }
 
+        List<RoomMember> selectedMembers = resolveSelectedAcceptedMembers(
+                userId,
+                acceptedMembers,
+                request.selectedMemberIds()
+        );
+
         // 방 멤버 ID 리스트
-        List<Long> memberIds = acceptedMembers.stream()
+        List<Long> memberIds = selectedMembers.stream()
                 .map(member -> member.getUser().getId())
                 .toList();
 
         int totalMemberCount = memberIds.size(); // 방 멤버 수
 
-        List<PromiseRecommendationMemberResponse> memberResponses = acceptedMembers.stream()
+        List<PromiseRecommendationMemberResponse> memberResponses = selectedMembers.stream()
                 .map(member -> new PromiseRecommendationMemberResponse(
                         member.getUser().getId(),
-                        member.getUser().getNickname(),        // [주의] User 엔티티 필드명에 맞게 수정
-                        member.getUser().getProfileImageUrl()  // [주의] 없으면 DTO에서도 제거
+                        member.getUser().getNickname(),
+                        member.getUser().getProfileImageUrl()
                 ))
                 .toList();
 
@@ -110,11 +116,11 @@ public class PromiseRecommendationService {
                         memberResponses
                 );
 
-// 2. 최종 정렬에 사용할 후보군
+        // 2. 최종 정렬에 사용할 후보군
         List<PromiseTimeRecommendationResponse> candidatePool = new ArrayList<>();
 
-// 3. 전원 가능 후보를 먼저 후보군에 넣는다.
-//    단, MAX_CANDIDATE_COUNT를 넘기지 않도록 제한한다.
+        // 3. 전원 가능 후보를 먼저 후보군에 넣는다.
+        //    단, MAX_CANDIDATE_COUNT를 넘기지 않도록 제한한다.
         for (PromiseTimeRecommendationResponse candidate : allAvailableCandidates) {
             if (candidatePool.size() >= MAX_CANDIDATE_COUNT) {
                 break;
@@ -123,7 +129,7 @@ public class PromiseRecommendationService {
             candidatePool.add(candidate);
         }
 
-// 4. 전원 가능 후보가 전혀 없다면 충돌 최소 후보를 수집하여 추가한다.
+        // 4. 전원 가능 후보가 전혀 없다면 충돌 최소 후보를 수집하여 추가한다.
         if (candidatePool.size() < MAX_CANDIDATE_COUNT) {
             List<PromiseTimeRecommendationResponse> leastConflictCandidates =
                     collectLeastConflictCandidates(
@@ -154,10 +160,51 @@ public class PromiseRecommendationService {
             }
         }
 
-// 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
+        // 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
         return candidatePool.stream()
                 .sorted(getFinalRecommendationComparator(request.sortType()))
                 .limit(RESPONSE_RECOMMENDATION_COUNT)
+                .toList();
+    }
+
+    private List<RoomMember> resolveSelectedAcceptedMembers(
+            Long loginUserId,
+            List<RoomMember> acceptedMembers,
+            List<Long> selectedMemberIds
+    ) {
+        if (selectedMemberIds == null || selectedMemberIds.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
+        }
+
+        Map<Long, RoomMember> acceptedMemberMap = new HashMap<>();
+
+        for (RoomMember member : acceptedMembers) {
+            acceptedMemberMap.put(member.getUser().getId(), member);
+        }
+
+        // 로그인 유저가 방 ACCEPTED 멤버인지 확인
+        if (!acceptedMemberMap.containsKey(loginUserId)) {
+            throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
+        }
+
+        Set<Long> participantIds = new LinkedHashSet<>();
+
+        // 약속 생성자는 항상 포함
+        participantIds.add(loginUserId);
+
+        // 프론트에서 선택한 멤버들 추가
+        participantIds.addAll(selectedMemberIds);
+
+        return participantIds.stream()
+                .map(memberId -> {
+                    RoomMember roomMember = acceptedMemberMap.get(memberId);
+
+                    if (roomMember == null) {
+                        throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
+                    }
+
+                    return roomMember;
+                })
                 .toList();
     }
 
@@ -680,12 +727,12 @@ public class PromiseRecommendationService {
     }
 
 
-    /*
+    /**
         모든 멤버가 가능한 시간이 없을 때,
         minDuration 길이만큼 시간창을 30분씩 밀어보면서
         가장 많은 멤버가 참석 가능한 시간대를 후보로 만드는 메서드
      */
-    /*
+    /**
     [수정]
     기존 방식:
         minDuration 길이만큼만 충돌 최소 후보를 반환했음.
@@ -706,7 +753,7 @@ public class PromiseRecommendationService {
 
         수정 후:
             14:00~17:00 / 2명 가능
-*/
+    */
     private List<PromiseTimeRecommendationResponse> collectLeastConflictTimeRanges(
             boolean[][] busy,
             LocalDateTime daySearchStart,
@@ -831,7 +878,7 @@ public class PromiseRecommendationService {
         return availableMembers;
     }
 
-    /*
+    /**
         이미 가능한 멤버 집합이 다음 block에서도 모두 가능한지 확인하는 메서드.
 
         예:
@@ -894,7 +941,7 @@ public class PromiseRecommendationService {
     }
 
 
-    /*
+    /**
     더 큰 후보에 포함되는 작은 충돌 최소 후보를 제거
     제거 기준:
         1. other가 candidate의 시간 범위를 완전히 포함하고
@@ -930,7 +977,7 @@ public class PromiseRecommendationService {
         return result;
     }
 
-    /*
+    /**
         outer가 inner의 시간 범위를 완전히 포함하는지 확인한다.
         예:
             outer = 14:00~17:00
@@ -947,7 +994,7 @@ public class PromiseRecommendationService {
                 && !outer.endTime().isBefore(inner.endTime());
     }
 
-    /*
+    /**
         완전히 같은 후보끼리 서로 제거되는 것을 막기 위한 메서드.
         other가 candidate보다
             - 더 일찍 시작하거나
@@ -993,8 +1040,8 @@ public class PromiseRecommendationService {
     }
 
 
-// 추천 후보군에는 전원 가능 후보와 충돌 최소 후보가 섞여 있을 수 있다.
-// 따라서 정렬 시 availableMemberCount도 보조 기준으로 넣어준다.
+    // 추천 후보군에는 전원 가능 후보와 충돌 최소 후보가 섞여 있을 수 있다.
+    // 따라서 정렬 시 availableMemberCount도 보조 기준으로 넣어준다.
     private Comparator<PromiseTimeRecommendationResponse> getFinalRecommendationComparator(
             PromiseTimeRecommendationSortType sortType
     ) {

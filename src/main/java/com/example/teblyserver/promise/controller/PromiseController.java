@@ -1,11 +1,8 @@
 package com.example.teblyserver.promise.controller;
 
 import com.example.teblyserver.common.response.ApiResponse;
-import com.example.teblyserver.promise.dto.request.PromiseCreateRequest;
-import com.example.teblyserver.promise.dto.request.PromisePokeRequest;
-import com.example.teblyserver.promise.dto.request.PromiseUpdateRequest;
+import com.example.teblyserver.promise.dto.request.*;
 import com.example.teblyserver.promise.dto.response.PromiseDetailResponse;
-import com.example.teblyserver.promise.dto.request.PromiseInvitationRespondRequest;
 import com.example.teblyserver.promise.dto.response.PromisePokeResponse;
 import com.example.teblyserver.promise.service.PromiseService;
 import jakarta.validation.Valid;
@@ -33,6 +30,32 @@ public class PromiseController {
         Long promiseId = promiseService.createPromise(userId, roomId, request);
 
         return ResponseEntity.ok(ApiResponse.success("약속이 성공적으로 생성되었습니다.", promiseId));
+    }
+
+    /**
+     * 추천 시간 선택 기반 약속 생성 API
+     *
+     * URL: POST /rooms/{roomId}/promises/from-recommendation
+     *
+     * 이 API는 프론트가 inviteeIds를 직접 보내지 않는다.
+     * 백엔드가 선택된 추천 시간의 availableMembers를 다시 계산한 뒤,
+     * 가능한 사람만 약속 멤버로 넣는다.
+     */
+    @PostMapping("/rooms/{roomId}/promises/from-recommendation")
+    public ResponseEntity<ApiResponse<Long>> createPromiseFromRecommendation(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long roomId,
+            @Valid @RequestBody PromiseCreateFromRecommendationRequest request
+    ) {
+        Long promiseId = promiseService.createPromiseFromRecommendation(
+                userId,
+                roomId,
+                request
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success("추천 시간 기반 약속이 성공적으로 생성되었습니다.", promiseId)
+        );
     }
 
     /**

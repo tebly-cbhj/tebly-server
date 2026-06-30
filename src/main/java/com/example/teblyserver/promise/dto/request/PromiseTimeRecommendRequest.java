@@ -1,10 +1,12 @@
 package com.example.teblyserver.promise.dto.request;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 public record PromiseTimeRecommendRequest(
 
@@ -26,6 +28,9 @@ public record PromiseTimeRecommendRequest(
 
         //sortType은 필수로 안 둬도 됨
         //안 보내면 기본값을 EARLIEST로 처리
-        PromiseTimeRecommendationSortType sortType
+        PromiseTimeRecommendationSortType sortType,
+
+        @NotEmpty(message = "추천 대상 멤버는 최소 1명 이상이어야 합니다.")
+        List<Long> selectedMemberIds
 ) {
 }
