@@ -4,6 +4,8 @@ import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.UserRepository;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
+import com.example.teblyserver.notification.domain.NotificationType;
+import com.example.teblyserver.notification.service.NotificationService;
 import com.example.teblyserver.promise.domain.Promise;
 import com.example.teblyserver.promise.domain.PromiseMember;
 import com.example.teblyserver.promise.domain.PromiseMemberStatus;
@@ -44,7 +46,7 @@ public class PromiseService {
     private final CategoryRepository categoryRepository;
     private final PromiseMemberRepository promiseMemberRepository;
     private final ScheduleService scheduleService;
-    //private final NotificationService notificationService;
+    private final NotificationService notificationService;
 
     /**
      * 새로운 약속 생성
@@ -373,7 +375,13 @@ public class PromiseService {
         targetMember.updateLastPokedAt(now);
 
         // 실제 알림 발송은 알림 서비스에서 처리
-        // TODO : 여기에 알림 서비스 주입 받아서 알림 처리 해야될듯
+        notificationService.send(
+                targetMember.getUser(),
+                NotificationType.POKE,
+                promise.getTitle(),
+                promise.getSender().getNickname() + "님이 '" + promise.getTitle() + "' 약속에 응답해달라고 콕 찔렀어요!",
+                "/promises/" + promiseId
+        );
 
         return new PromisePokeResponse(
                 targetUserId,
