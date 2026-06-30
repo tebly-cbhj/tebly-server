@@ -2,11 +2,16 @@ package com.example.teblyserver.promise.service;
 
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
+import com.example.teblyserver.promise.domain.Promise;
+import com.example.teblyserver.promise.domain.PromiseMember;
+import com.example.teblyserver.promise.domain.PromiseStatus;
 import com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendRequest;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendationSortType;
+import com.example.teblyserver.promise.dto.request.PromiseUpdateTimeRecommendRequest;
 import com.example.teblyserver.promise.dto.response.PromiseRecommendationMemberResponse;
 import com.example.teblyserver.promise.dto.response.PromiseTimeRecommendationResponse;
+import com.example.teblyserver.promise.repository.PromiseRepository;
 import com.example.teblyserver.room.domain.InviteStatus;
 import com.example.teblyserver.room.domain.Room;
 import com.example.teblyserver.room.domain.RoomMember;
@@ -33,6 +38,7 @@ public class PromiseRecommendationService {
 
     private final RoomRepository roomRepository;
     private final ScheduleRepository scheduleRepository;
+    private final PromiseRepository promiseRepository;
 
     public List<PromiseTimeRecommendationResponse> recommendPromiseTimes(
             Long userId,
@@ -1184,7 +1190,106 @@ public class PromiseRecommendationService {
             );
         }
     }
+
+
+    /**
+     * 약속 수정용 빈 시간 추천
+     *
+     * 수정용 추천 대상:
+     * - 현재 약속의 생성자
+     * - 현재 약속의 기존 PromiseMember들
+     *
+     * 주의:
+     * recommendPromiseTimes()는 내부에서 로그인 유저를 자동 포함한다.
+     * 따라서 여기서는 생성자를 제외한 멤버 ID만 selectedMemberIds로 넘긴다.
+     */
+    @Transactional(readOnly = true)
+    public List<PromiseTimeRecommendationResponse> recommendPromiseUpdateTimes(
+            Long userId,
+            Long promiseId,
+            PromiseUpdateTimeRecommendRequest request
+    ) {
+        // 1. 기존 약속 조회
+        // findWithMembersById()는 sender, members, members.user를 함께 조회한다.
+        Promise promise = promiseRepository.findWithMembersById(promiseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PROMISE_NOT_FOUND));
+
+        // 2. 약속 생성자만 추천 기반 시간 수정을 시도할 수 있도록 검증
+        validatePromiseSenderForRecommendation(promise, userId);
+
+        // 3. 이미 확정/취소된 약속은 시간 추천 수정 대상이 아님
+        validatePromisePendingForRecommendation(promise);
+
+        // 4. 현재 약속 멤버 중 생성자를 제외한 멤버 ID 추출
+        // recommendPromiseTimes()가 로그인 유저를 자동 포함하므로 생성자는 제외한다.
+        List<Long> selectedMemberIds = getPromiseMemberIdsExceptSender(promise);
+
+        // 5. 기존 빈 시간 추천 Request DTO로 변환
+        PromiseTimeRecommendRequest recommendRequest = new PromiseTimeRecommendRequest(
+                request.proposeStartDate(),
+                request.proposeEndDate(),
+                request.searchStartTime(),
+                request.searchEndTime(),
+                request.minDuration(),
+                request.sortType(),
+                selectedMemberIds
+        );
+
+        // 6. 기존 추천 알고리즘 재사용
+        // roomId는 기존 약속이 속한 방 ID를 사용한다.
+        return recommendPromiseTimes(
+                userId,
+                promise.getRoom().getId(),
+                recommendRequest
+        );
+    }
+
+    /**
+     * 현재 약속 멤버 중 생성자를 제외한 userId 목록을 반환한다.
+     *
+     * 이유:
+     * - recommendPromiseTimes()는 로그인 유저를 자동으로 추천 대상에 포함함
+     * - 따라서 selectedMemberIds에는 생성자를 제외한 나머지 멤버만 넣어야 중복이 자연스럽게 처리됨
+     */
+    private List<Long> getPromiseMemberIdsExceptSender(Promise promise) {
+        Long senderId = promise.getSender().getId();
+
+        List<Long> memberIds = promise.getMembers().stream()
+                .map(PromiseMember::getUser)
+                .map(user -> user.getId())
+                .filter(memberId -> !memberId.equals(senderId))
+                .distinct()
+                .toList();
+
+        // 생성자 혼자만 있는 약속이라면 추천 기반 수정의 의미가 약하므로 예외 처리
+        if (memberIds.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
+        }
+
+        return memberIds;
+    }
+
+    /**
+     * 약속 생성자인지 검증
+     *
+     * 추천 기반 수정은 약속의 시간을 바꾸는 흐름이므로
+     * 약속 생성자만 가능하게 제한한다.
+     */
+    private void validatePromiseSenderForRecommendation(Promise promise, Long userId) {
+        if (!promise.getSender().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.PROMISE_FORBIDDEN);
+        }
+    }
+
+    /**
+     * PENDING 상태의 약속인지 검증
+     *
+     * 이미 확정된 약속은 각 멤버의 개인 일정에 등록되었을 수 있으므로
+     * 현재 구조에서는 추천 기반 시간 수정을 막는다.
+     */
+    private void validatePromisePendingForRecommendation(Promise promise) {
+        if (promise.getStatus() != PromiseStatus.PENDING) {
+            throw new CustomException(ErrorCode.PROMISE_ALREADY_CLOSED);
+        }
+    }
 }
-
-
-
