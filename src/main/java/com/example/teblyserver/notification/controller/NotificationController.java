@@ -23,8 +23,7 @@ public class NotificationController {
     // 초대 알림 목록 조회
     @GetMapping("/invitation")
     public ResponseEntity<NotificationInvitationResponse> getInvitationNotifications(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+            @AuthenticationPrincipal Long userId) {
 
         List<Notification> roomInvitations = notificationService.getInvitationNotifications(userId);
         List<PromiseInvitationResponse> promiseInvitations = promiseService.getPendingInvitations(userId);
@@ -35,8 +34,8 @@ public class NotificationController {
     // 일반 알림 목록 조회
     @GetMapping("/common")
     public ResponseEntity<List<Notification>> getCommonNotifications(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+            @AuthenticationPrincipal Long userId) {
+
         return ResponseEntity.ok(notificationService.getCommonNotifications(userId));
     }
 
