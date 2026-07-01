@@ -167,4 +167,32 @@ public class PromiseController {
 
         return ResponseEntity.ok(ApiResponse.success("콕찌르기 알림을 보냈습니다.", response));
     }
+
+    /**
+     * 추천 시간 선택 기반 약속 시간 수정 API
+     *
+     * URL: PATCH /promises/{promiseId}/time/from-recommendation
+     *
+     * 역할:
+     * - 약속 수정 화면에서 추천 시간 중 하나를 선택했을 때 호출한다.
+     * - 기존 PromiseMember는 삭제하지 않는다.
+     * - 약속 시간만 변경한다.
+     * - 시간이 변경되면 생성자는 ACCEPTED 유지, 나머지는 PENDING으로 초기화한다.
+     */
+    @PatchMapping("/promises/{promiseId}/time/from-recommendation")
+    public ResponseEntity<ApiResponse<Long>> updatePromiseTimeFromRecommendation(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long promiseId,
+            @Valid @RequestBody PromiseUpdateTimeFromRecommendationRequest request
+    ) {
+        Long updatedPromiseId = promiseService.updatePromiseTimeFromRecommendation(
+                userId,
+                promiseId,
+                request
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success("추천 시간 기반으로 약속 시간이 수정되었습니다.", updatedPromiseId)
+        );
+    }
 }

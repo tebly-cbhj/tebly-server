@@ -30,10 +30,18 @@ public record PromiseCreateFromRecommendationRequest(
         @NotNull(message = "하루 탐색 종료 시간은 필수입니다.")
         LocalTime searchEndTime,
 
-        @NotNull(message = "선택한 추천 시작 시간은 필수입니다.")
+        // 추가: 프론트가 선택한 원래 추천 카드의 시작 시간
+        @NotNull(message = "원본 추천 시작 시간은 필수입니다.")
+        LocalDateTime recommendedStartTime,
+
+        // 추가: 프론트가 선택한 원래 추천 카드의 종료 시간
+        @NotNull(message = "원본 추천 종료 시간은 필수입니다.")
+        LocalDateTime recommendedEndTime,
+
+        // 최종 약속 시작 시간
         LocalDateTime selectedStartTime,
 
-        @NotNull(message = "선택한 추천 종료 시간은 필수입니다.")
+        // 최종 약속 종료 시간
         LocalDateTime selectedEndTime,
 
         @Size(max = 50, message = "장소는 50자를 넘을 수 없습니다.")
