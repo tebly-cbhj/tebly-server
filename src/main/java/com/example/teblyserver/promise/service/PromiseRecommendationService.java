@@ -2,16 +2,16 @@ package com.example.teblyserver.promise.service;
 
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
-import com.example.teblyserver.decision.dto.CandidateSlotDto;
-import com.example.teblyserver.decision.dto.DecisionCacheDto;
-import com.example.teblyserver.decision.dto.MemberAvailabilityDto;
-import com.example.teblyserver.decision.dto.MemberSummaryDto;
-import com.example.teblyserver.decision.service.DecisionCacheService;
+import com.example.teblyserver.promise.domain.Promise;
+import com.example.teblyserver.promise.domain.PromiseMember;
+import com.example.teblyserver.promise.domain.PromiseStatus;
 import com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendRequest;
 import com.example.teblyserver.promise.dto.request.PromiseTimeRecommendationSortType;
+import com.example.teblyserver.promise.dto.request.PromiseUpdateTimeRecommendRequest;
 import com.example.teblyserver.promise.dto.response.PromiseRecommendationMemberResponse;
 import com.example.teblyserver.promise.dto.response.PromiseTimeRecommendationResponse;
+import com.example.teblyserver.promise.repository.PromiseRepository;
 import com.example.teblyserver.room.domain.InviteStatus;
 import com.example.teblyserver.room.domain.Room;
 import com.example.teblyserver.room.domain.RoomMember;
@@ -38,7 +38,7 @@ public class PromiseRecommendationService {
 
     private final RoomRepository roomRepository;
     private final ScheduleRepository scheduleRepository;
-    private final DecisionCacheService decisionCacheService;
+    private final PromiseRepository promiseRepository;
 
     public List<PromiseTimeRecommendationResponse> recommendPromiseTimes(
             Long userId,
@@ -69,18 +69,24 @@ public class PromiseRecommendationService {
             throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
         }
 
+        List<RoomMember> selectedMembers = resolveSelectedAcceptedMembers(
+                userId,
+                acceptedMembers,
+                request.selectedMemberIds()
+        );
+
         // 방 멤버 ID 리스트
-        List<Long> memberIds = acceptedMembers.stream()
+        List<Long> memberIds = selectedMembers.stream()
                 .map(member -> member.getUser().getId())
                 .toList();
 
         int totalMemberCount = memberIds.size(); // 방 멤버 수
 
-        List<PromiseRecommendationMemberResponse> memberResponses = acceptedMembers.stream()
+        List<PromiseRecommendationMemberResponse> memberResponses = selectedMembers.stream()
                 .map(member -> new PromiseRecommendationMemberResponse(
                         member.getUser().getId(),
-                        member.getUser().getNickname(),        // [주의] User 엔티티 필드명에 맞게 수정
-                        member.getUser().getProfileImageUrl()  // [주의] 없으면 DTO에서도 제거
+                        member.getUser().getNickname(),
+                        member.getUser().getProfileImageUrl()
                 ))
                 .toList();
 
@@ -116,11 +122,11 @@ public class PromiseRecommendationService {
                         memberResponses
                 );
 
-// 2. 최종 정렬에 사용할 후보군
+        // 2. 최종 정렬에 사용할 후보군
         List<PromiseTimeRecommendationResponse> candidatePool = new ArrayList<>();
 
-// 3. 전원 가능 후보를 먼저 후보군에 넣는다.
-//    단, MAX_CANDIDATE_COUNT를 넘기지 않도록 제한한다.
+        // 3. 전원 가능 후보를 먼저 후보군에 넣는다.
+        //    단, MAX_CANDIDATE_COUNT를 넘기지 않도록 제한한다.
         for (PromiseTimeRecommendationResponse candidate : allAvailableCandidates) {
             if (candidatePool.size() >= MAX_CANDIDATE_COUNT) {
                 break;
@@ -129,7 +135,7 @@ public class PromiseRecommendationService {
             candidatePool.add(candidate);
         }
 
-// 4. 전원 가능 후보가 전혀 없다면 충돌 최소 후보를 수집하여 추가한다.
+        // 4. 전원 가능 후보가 전혀 없다면 충돌 최소 후보를 수집하여 추가한다.
         if (candidatePool.size() < MAX_CANDIDATE_COUNT) {
             List<PromiseTimeRecommendationResponse> leastConflictCandidates =
                     collectLeastConflictCandidates(
@@ -160,75 +166,51 @@ public class PromiseRecommendationService {
             }
         }
 
-// 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
-        List<PromiseTimeRecommendationResponse> finalRecommendations = candidatePool.stream()
+        // 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
+        return candidatePool.stream()
                 .sorted(getFinalRecommendationComparator(request.sortType()))
                 .limit(RESPONSE_RECOMMENDATION_COUNT)
                 .toList();
-
-        // 6. 알고리즘 결과를 Redis에 캐싱 → 결정 도우미(LLM) API에서 roomId로 꺼내 사용
-        cacheDecisionResult(roomId, request, finalRecommendations);
-
-        return finalRecommendations;
     }
 
-    // 추천 결과를 결정 도우미용 캐시(DecisionCacheDto)로 변환해 Redis에 저장
-    private void cacheDecisionResult(
-            Long roomId,
-            PromiseTimeRecommendRequest request,
-            List<PromiseTimeRecommendationResponse> finalRecommendations
+    private List<RoomMember> resolveSelectedAcceptedMembers(
+            Long loginUserId,
+            List<RoomMember> acceptedMembers,
+            List<Long> selectedMemberIds
     ) {
-        boolean noCandidate = finalRecommendations.isEmpty();
-
-        List<CandidateSlotDto> candidates = toCandidateSlots(finalRecommendations);
-
-        // TODO: noCandidate=true 시 memberAvailability 구성 필요
-        //       (현재 알고리즘에서 멤버별 freeRanges 직접 추출이 어려워 일단 빈 리스트로 저장)
-        List<MemberAvailabilityDto> memberAvailability = noCandidate ? List.of() : null;
-
-        DecisionCacheDto cacheDto = new DecisionCacheDto(
-                noCandidate,
-                candidates,
-                memberAvailability,
-                request.proposeStartDate(),
-                request.proposeEndDate()
-        );
-
-        decisionCacheService.saveDecisionCache(roomId, cacheDto);
-    }
-
-    // PromiseTimeRecommendationResponse → CandidateSlotDto 변환 (slotId는 순서대로 "slot-N" 부여)
-    private List<CandidateSlotDto> toCandidateSlots(
-            List<PromiseTimeRecommendationResponse> recommendations
-    ) {
-        List<CandidateSlotDto> candidateSlots = new ArrayList<>();
-
-        for (int i = 0; i < recommendations.size(); i++) {
-            PromiseTimeRecommendationResponse recommendation = recommendations.get(i);
-
-            candidateSlots.add(
-                    new CandidateSlotDto(
-                            "slot-" + (i + 1),
-                            recommendation.startTime(),
-                            recommendation.endTime(),
-                            recommendation.durationMinutes(),
-                            recommendation.allAvailable(),
-                            recommendation.availableMemberCount(),
-                            recommendation.totalMemberCount(),
-                            toMemberSummaries(recommendation.availableMembers()),
-                            toMemberSummaries(recommendation.unavailableMembers())
-                    )
-            );
+        if (selectedMemberIds == null || selectedMemberIds.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
         }
 
-        return candidateSlots;
-    }
+        Map<Long, RoomMember> acceptedMemberMap = new HashMap<>();
 
-    private List<MemberSummaryDto> toMemberSummaries(
-            List<PromiseRecommendationMemberResponse> members
-    ) {
-        return members.stream()
-                .map(member -> new MemberSummaryDto(member.nickname()))
+        for (RoomMember member : acceptedMembers) {
+            acceptedMemberMap.put(member.getUser().getId(), member);
+        }
+
+        // 로그인 유저가 방 ACCEPTED 멤버인지 확인
+        if (!acceptedMemberMap.containsKey(loginUserId)) {
+            throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
+        }
+
+        Set<Long> participantIds = new LinkedHashSet<>();
+
+        // 약속 생성자는 항상 포함
+        participantIds.add(loginUserId);
+
+        // 프론트에서 선택한 멤버들 추가
+        participantIds.addAll(selectedMemberIds);
+
+        return participantIds.stream()
+                .map(memberId -> {
+                    RoomMember roomMember = acceptedMemberMap.get(memberId);
+
+                    if (roomMember == null) {
+                        throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
+                    }
+
+                    return roomMember;
+                })
                 .toList();
     }
 
@@ -751,12 +733,12 @@ public class PromiseRecommendationService {
     }
 
 
-    /*
+    /**
         모든 멤버가 가능한 시간이 없을 때,
         minDuration 길이만큼 시간창을 30분씩 밀어보면서
         가장 많은 멤버가 참석 가능한 시간대를 후보로 만드는 메서드
      */
-    /*
+    /**
     [수정]
     기존 방식:
         minDuration 길이만큼만 충돌 최소 후보를 반환했음.
@@ -777,7 +759,7 @@ public class PromiseRecommendationService {
 
         수정 후:
             14:00~17:00 / 2명 가능
-*/
+    */
     private List<PromiseTimeRecommendationResponse> collectLeastConflictTimeRanges(
             boolean[][] busy,
             LocalDateTime daySearchStart,
@@ -902,7 +884,7 @@ public class PromiseRecommendationService {
         return availableMembers;
     }
 
-    /*
+    /**
         이미 가능한 멤버 집합이 다음 block에서도 모두 가능한지 확인하는 메서드.
 
         예:
@@ -965,7 +947,7 @@ public class PromiseRecommendationService {
     }
 
 
-    /*
+    /**
     더 큰 후보에 포함되는 작은 충돌 최소 후보를 제거
     제거 기준:
         1. other가 candidate의 시간 범위를 완전히 포함하고
@@ -1001,7 +983,7 @@ public class PromiseRecommendationService {
         return result;
     }
 
-    /*
+    /**
         outer가 inner의 시간 범위를 완전히 포함하는지 확인한다.
         예:
             outer = 14:00~17:00
@@ -1018,7 +1000,7 @@ public class PromiseRecommendationService {
                 && !outer.endTime().isBefore(inner.endTime());
     }
 
-    /*
+    /**
         완전히 같은 후보끼리 서로 제거되는 것을 막기 위한 메서드.
         other가 candidate보다
             - 더 일찍 시작하거나
@@ -1064,8 +1046,8 @@ public class PromiseRecommendationService {
     }
 
 
-// 추천 후보군에는 전원 가능 후보와 충돌 최소 후보가 섞여 있을 수 있다.
-// 따라서 정렬 시 availableMemberCount도 보조 기준으로 넣어준다.
+    // 추천 후보군에는 전원 가능 후보와 충돌 최소 후보가 섞여 있을 수 있다.
+    // 따라서 정렬 시 availableMemberCount도 보조 기준으로 넣어준다.
     private Comparator<PromiseTimeRecommendationResponse> getFinalRecommendationComparator(
             PromiseTimeRecommendationSortType sortType
     ) {
@@ -1208,7 +1190,106 @@ public class PromiseRecommendationService {
             );
         }
     }
+
+
+    /**
+     * 약속 수정용 빈 시간 추천
+     *
+     * 수정용 추천 대상:
+     * - 현재 약속의 생성자
+     * - 현재 약속의 기존 PromiseMember들
+     *
+     * 주의:
+     * recommendPromiseTimes()는 내부에서 로그인 유저를 자동 포함한다.
+     * 따라서 여기서는 생성자를 제외한 멤버 ID만 selectedMemberIds로 넘긴다.
+     */
+    @Transactional(readOnly = true)
+    public List<PromiseTimeRecommendationResponse> recommendPromiseUpdateTimes(
+            Long userId,
+            Long promiseId,
+            PromiseUpdateTimeRecommendRequest request
+    ) {
+        // 1. 기존 약속 조회
+        // findWithMembersById()는 sender, members, members.user를 함께 조회한다.
+        Promise promise = promiseRepository.findWithMembersById(promiseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PROMISE_NOT_FOUND));
+
+        // 2. 약속 생성자만 추천 기반 시간 수정을 시도할 수 있도록 검증
+        validatePromiseSenderForRecommendation(promise, userId);
+
+        // 3. 이미 확정/취소된 약속은 시간 추천 수정 대상이 아님
+        validatePromisePendingForRecommendation(promise);
+
+        // 4. 현재 약속 멤버 중 생성자를 제외한 멤버 ID 추출
+        // recommendPromiseTimes()가 로그인 유저를 자동 포함하므로 생성자는 제외한다.
+        List<Long> selectedMemberIds = getPromiseMemberIdsExceptSender(promise);
+
+        // 5. 기존 빈 시간 추천 Request DTO로 변환
+        PromiseTimeRecommendRequest recommendRequest = new PromiseTimeRecommendRequest(
+                request.proposeStartDate(),
+                request.proposeEndDate(),
+                request.searchStartTime(),
+                request.searchEndTime(),
+                request.minDuration(),
+                request.sortType(),
+                selectedMemberIds
+        );
+
+        // 6. 기존 추천 알고리즘 재사용
+        // roomId는 기존 약속이 속한 방 ID를 사용한다.
+        return recommendPromiseTimes(
+                userId,
+                promise.getRoom().getId(),
+                recommendRequest
+        );
+    }
+
+    /**
+     * 현재 약속 멤버 중 생성자를 제외한 userId 목록을 반환한다.
+     *
+     * 이유:
+     * - recommendPromiseTimes()는 로그인 유저를 자동으로 추천 대상에 포함함
+     * - 따라서 selectedMemberIds에는 생성자를 제외한 나머지 멤버만 넣어야 중복이 자연스럽게 처리됨
+     */
+    private List<Long> getPromiseMemberIdsExceptSender(Promise promise) {
+        Long senderId = promise.getSender().getId();
+
+        List<Long> memberIds = promise.getMembers().stream()
+                .map(PromiseMember::getUser)
+                .map(user -> user.getId())
+                .filter(memberId -> !memberId.equals(senderId))
+                .distinct()
+                .toList();
+
+        // 생성자 혼자만 있는 약속이라면 추천 기반 수정의 의미가 약하므로 예외 처리
+        if (memberIds.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
+        }
+
+        return memberIds;
+    }
+
+    /**
+     * 약속 생성자인지 검증
+     *
+     * 추천 기반 수정은 약속의 시간을 바꾸는 흐름이므로
+     * 약속 생성자만 가능하게 제한한다.
+     */
+    private void validatePromiseSenderForRecommendation(Promise promise, Long userId) {
+        if (!promise.getSender().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.PROMISE_FORBIDDEN);
+        }
+    }
+
+    /**
+     * PENDING 상태의 약속인지 검증
+     *
+     * 이미 확정된 약속은 각 멤버의 개인 일정에 등록되었을 수 있으므로
+     * 현재 구조에서는 추천 기반 시간 수정을 막는다.
+     */
+    private void validatePromisePendingForRecommendation(Promise promise) {
+        if (promise.getStatus() != PromiseStatus.PENDING) {
+            throw new CustomException(ErrorCode.PROMISE_ALREADY_CLOSED);
+        }
+    }
 }
-
-
-

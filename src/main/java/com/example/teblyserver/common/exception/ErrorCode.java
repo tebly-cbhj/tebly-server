@@ -28,17 +28,20 @@ public enum ErrorCode {
     ROOM_FORBIDDEN(HttpStatus.FORBIDDEN, "ROOM_403_1", "해당 방에 접근할 권한이 없습니다."),
     HOST_CANNOT_LEAVE_ROOM(HttpStatus.BAD_REQUEST, "ROOM_400_1", "방장은 방을 나갈 수 없습니다."),
 
+    // notification - 4xx
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404_1", "존재하지 않는 알림입니다."),
     PROMISE_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "PROMISE_400_1", "이미 확정되었거나 취소된 약속입니다."),
-    INVALID_PROMISE_TIME(HttpStatus.BAD_REQUEST, "PROMISE_400_2","약속 시간이 올바르지 않습니다."),
+    INVALID_PROMISE_TIME(HttpStatus.BAD_REQUEST, "PROMISE_400_2", "약속 시간이 올바르지 않습니다."),
     INVALID_PROMISE_DURATION(HttpStatus.BAD_REQUEST, "PROMISE_400_3", "약속 시간이 최소 시간보다 짧습니다."),
-    INVALID_PROMISE_CATEGORY(HttpStatus.BAD_REQUEST, "PROMISE_400_4","약속 카테고리는 기본 카테고리 중에서 선택해야 합니다."),
-    PROMISE_MEMBER_NOT_PENDING(HttpStatus.BAD_REQUEST, "PROMISE_400_5","미응답 상태인 멤버만 콕찌르기 할 수 있습니다."),
-    PROMISE_POKE_ALREADY_SENT(HttpStatus.BAD_REQUEST, "PROMISE_400_6","오늘 이미 해당 멤버에게 콕찌르기를 보냈습니다."),
-    CANNOT_POKE_SELF(HttpStatus.BAD_REQUEST, "PROMISE_400_7","자기 자신에게는 콕찌르기를 보낼 수 없습니다."),
+    INVALID_PROMISE_CATEGORY(HttpStatus.BAD_REQUEST, "PROMISE_400_4", "약속 카테고리는 기본 카테고리 중에서 선택해야 합니다."),
+    INVALID_PROMISE_MEMBER(HttpStatus.BAD_REQUEST, "PROMISE_400_5", "약속 참여 멤버가 올바르지 않습니다."),
+    PROMISE_MEMBER_NOT_PENDING(HttpStatus.BAD_REQUEST, "PROMISE_400_5", "미응답 상태인 멤버만 콕찌르기 할 수 있습니다."),
+    PROMISE_POKE_ALREADY_SENT(HttpStatus.BAD_REQUEST, "PROMISE_400_6", "오늘 이미 해당 멤버에게 콕찌르기를 보냈습니다."),
+    CANNOT_POKE_SELF(HttpStatus.BAD_REQUEST, "PROMISE_400_7", "자기 자신에게는 콕찌르기를 보낼 수 없습니다."),
     PROMISE_NOT_FOUND(HttpStatus.NOT_FOUND, "PROMISE_404_1", "존재하지 않는 약속입니다."),
-    PROMISE_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "PROMISE_404_2","해당 약속에 포함되지 않은 멤버입니다."),
+    PROMISE_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "PROMISE_404_2", "해당 약속에 포함되지 않은 멤버입니다."),
     PROMISE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_1", "해당 약속의 권한이 없습니다."),
-
+    PROMISE_INVITEE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_2", "초대 대상은 방에 참여 중인 멤버만 선택할 수 있습니다."),
 
     // decision (결정 도우미) - 4xx
     DECISION_CACHE_NOT_FOUND(HttpStatus.NOT_FOUND, "DECISION_404_1", "결정 도우미용 추천 캐시를 찾을 수 없습니다. 추천을 먼저 실행해주세요."),
@@ -56,7 +59,8 @@ public enum ErrorCode {
 
     // 5xx - Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500_1", "서버 내부 오류가 발생했습니다."),
-    DEFAULT_CATEGORY_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "CATEGORY_500_1", "사용자의 기본(기타) 카테고리가 존재하지 않습니다.");
+    DEFAULT_CATEGORY_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "CATEGORY_500_1", "사용자의 기본(기타) 카테고리가 존재하지 않습니다."),
+    ;
 
     private final HttpStatus httpStatus;
     private final String code;

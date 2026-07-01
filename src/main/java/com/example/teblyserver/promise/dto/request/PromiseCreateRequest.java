@@ -1,12 +1,10 @@
 package com.example.teblyserver.promise.dto.request;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record PromiseCreateRequest(
         @NotBlank(message = "약속 이름은 필수입니다.")
@@ -38,6 +36,9 @@ public record PromiseCreateRequest(
         Integer notificationLeadMinutes,
 
         @NotNull(message = "최소 시간 설정은 필수입니다.")
-        Integer minDuration
+        Integer minDuration,
+
+        @NotEmpty(message = "초대할 멤버를 최소 1명 이상 선택해야 합니다.")
+        List<@NotNull(message = "초대할 멤버 ID는 null일 수 없습니다.") Long> inviteeIds
 ) {
 }

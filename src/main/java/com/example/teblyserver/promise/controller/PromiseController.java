@@ -1,11 +1,8 @@
 package com.example.teblyserver.promise.controller;
 
 import com.example.teblyserver.common.response.ApiResponse;
-import com.example.teblyserver.promise.dto.request.PromiseCreateRequest;
-import com.example.teblyserver.promise.dto.request.PromisePokeRequest;
-import com.example.teblyserver.promise.dto.request.PromiseUpdateRequest;
+import com.example.teblyserver.promise.dto.request.*;
 import com.example.teblyserver.promise.dto.response.PromiseDetailResponse;
-import com.example.teblyserver.promise.dto.request.PromiseInvitationRespondRequest;
 import com.example.teblyserver.promise.dto.response.PromisePokeResponse;
 import com.example.teblyserver.promise.service.PromiseService;
 import jakarta.validation.Valid;
@@ -33,6 +30,32 @@ public class PromiseController {
         Long promiseId = promiseService.createPromise(userId, roomId, request);
 
         return ResponseEntity.ok(ApiResponse.success("약속이 성공적으로 생성되었습니다.", promiseId));
+    }
+
+    /**
+     * 추천 시간 선택 기반 약속 생성 API
+     *
+     * URL: POST /rooms/{roomId}/promises/from-recommendation
+     *
+     * 이 API는 프론트가 inviteeIds를 직접 보내지 않는다.
+     * 백엔드가 선택된 추천 시간의 availableMembers를 다시 계산한 뒤,
+     * 가능한 사람만 약속 멤버로 넣는다.
+     */
+    @PostMapping("/rooms/{roomId}/promises/from-recommendation")
+    public ResponseEntity<ApiResponse<Long>> createPromiseFromRecommendation(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long roomId,
+            @Valid @RequestBody PromiseCreateFromRecommendationRequest request
+    ) {
+        Long promiseId = promiseService.createPromiseFromRecommendation(
+                userId,
+                roomId,
+                request
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success("추천 시간 기반 약속이 성공적으로 생성되었습니다.", promiseId)
+        );
     }
 
     /**
@@ -143,5 +166,33 @@ public class PromiseController {
         );
 
         return ResponseEntity.ok(ApiResponse.success("콕찌르기 알림을 보냈습니다.", response));
+    }
+
+    /**
+     * 추천 시간 선택 기반 약속 시간 수정 API
+     *
+     * URL: PATCH /promises/{promiseId}/time/from-recommendation
+     *
+     * 역할:
+     * - 약속 수정 화면에서 추천 시간 중 하나를 선택했을 때 호출한다.
+     * - 기존 PromiseMember는 삭제하지 않는다.
+     * - 약속 시간만 변경한다.
+     * - 시간이 변경되면 생성자는 ACCEPTED 유지, 나머지는 PENDING으로 초기화한다.
+     */
+    @PatchMapping("/promises/{promiseId}/time/from-recommendation")
+    public ResponseEntity<ApiResponse<Long>> updatePromiseTimeFromRecommendation(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long promiseId,
+            @Valid @RequestBody PromiseUpdateTimeFromRecommendationRequest request
+    ) {
+        Long updatedPromiseId = promiseService.updatePromiseTimeFromRecommendation(
+                userId,
+                promiseId,
+                request
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success("추천 시간 기반으로 약속 시간이 수정되었습니다.", updatedPromiseId)
+        );
     }
 }
