@@ -28,6 +28,8 @@ public enum ErrorCode {
     ROOM_FORBIDDEN(HttpStatus.FORBIDDEN, "ROOM_403_1", "해당 방에 접근할 권한이 없습니다."),
     HOST_CANNOT_LEAVE_ROOM(HttpStatus.BAD_REQUEST, "ROOM_400_1", "방장은 방을 나갈 수 없습니다."),
 
+    // notification - 4xx
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404_1", "존재하지 않는 알림입니다."),
     PROMISE_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "PROMISE_400_1", "이미 확정되었거나 취소된 약속입니다."),
     INVALID_PROMISE_TIME(HttpStatus.BAD_REQUEST, "PROMISE_400_2", "약속 시간이 올바르지 않습니다."),
     INVALID_PROMISE_DURATION(HttpStatus.BAD_REQUEST, "PROMISE_400_3", "약속 시간이 최소 시간보다 짧습니다."),
