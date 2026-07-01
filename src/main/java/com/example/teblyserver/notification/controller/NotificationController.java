@@ -1,15 +1,15 @@
 package com.example.teblyserver.notification.controller;
 
 import com.example.teblyserver.notification.domain.Notification;
+import com.example.teblyserver.notification.dto.NotificationInvitationResponse;
 import com.example.teblyserver.notification.service.NotificationService;
+import com.example.teblyserver.promise.dto.response.PromiseInvitationResponse;
+import com.example.teblyserver.promise.service.PromiseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import com.example.teblyserver.notification.dto.NotificationInvitationResponse;
-import com.example.teblyserver.promise.dto.response.PromiseInvitationResponse;
-import com.example.teblyserver.promise.service.PromiseService;
+
 import java.util.List;
 
 @RestController
