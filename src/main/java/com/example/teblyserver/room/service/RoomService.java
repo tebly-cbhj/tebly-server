@@ -230,6 +230,14 @@ public class RoomService {
 
             if (!alreadyActive) {
                 RoomMember.create(room, invitee, RoomRole.MEMBER, InviteStatus.PENDING);
+                // 추가로 초대된 멤버에게 알림 발송
+                notificationService.send(
+                        invitee,
+                        NotificationType.INVITATION,
+                        "방 초대",
+                        room.getName() + "에 초대되었어요!",
+                        "/rooms/" + roomId
+                );
             }
         }
     }
