@@ -10,13 +10,11 @@ import com.example.teblyserver.promise.domain.Promise;
 import com.example.teblyserver.promise.domain.PromiseMember;
 import com.example.teblyserver.promise.domain.PromiseMemberStatus;
 import com.example.teblyserver.promise.domain.PromiseStatus;
-import com.example.teblyserver.promise.dto.request.PromiseCreateRequest;
-import com.example.teblyserver.promise.dto.request.PromisePokeRequest;
-import com.example.teblyserver.promise.dto.request.PromiseUpdateRequest;
+import com.example.teblyserver.promise.dto.request.*;
 import com.example.teblyserver.promise.dto.response.PromiseDetailResponse;
-import com.example.teblyserver.promise.dto.request.PromiseInvitationRespondRequest;
 import com.example.teblyserver.promise.dto.response.PromiseInvitationResponse;
 import com.example.teblyserver.promise.dto.response.PromisePokeResponse;
+import com.example.teblyserver.promise.dto.response.PromiseTimeRecommendationResponse;
 import com.example.teblyserver.promise.repository.PromiseMemberRepository;
 import com.example.teblyserver.promise.repository.PromiseRepository;
 import com.example.teblyserver.room.domain.InviteStatus;
@@ -33,8 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +46,7 @@ public class PromiseService {
     private final CategoryRepository categoryRepository;
     private final PromiseMemberRepository promiseMemberRepository;
     private final ScheduleService scheduleService;
+    private final PromiseRecommendationService promiseRecommendationService;
     private final NotificationService notificationService;
 
     /**
@@ -99,25 +100,121 @@ public class PromiseService {
                 request.location(), request.notificationLeadMinutes(), request.minDuration()
         );
 
-        // 5. 방에 있는 '수락된' 멤버들을 모두 이 약속의 멤버(PENDING)로 초대
-        for (RoomMember roomMember : room.getMembers()) {
-            if (roomMember.getInviteStatus() == InviteStatus.ACCEPTED) {
-                // PromiseMember를 생성해서 Promise의 주머니(members)에 쏙 넣어줌
-                PromiseMember newPromiseMember = PromiseMember.create(roomMember.getUser(), promise);
+        // 약속 생성자는 항상 PromiseMember에 포함하고 ACCEPTED 처리
+        PromiseMember senderPromiseMember = PromiseMember.create(sender, promise);
+        senderPromiseMember.updateStatus(PromiseMemberStatus.ACCEPTED);
+        promise.getMembers().add(senderPromiseMember);
 
-                // 약속 생성자는 본인이 만든 약속이므로 기본 참석 상태로 저장
-                if (roomMember.getUser().getId().equals(userId)) {
-                    newPromiseMember.updateStatus(PromiseMemberStatus.ACCEPTED);
-                }
+        // 프론트에서 선택한 초대 대상 userId 중복 제거
+        Set<Long> inviteeIds = new LinkedHashSet<>(request.inviteeIds());
+        // 생성자가 inviteeIds에 들어와도 중복 생성되지 않도록 제거
+        inviteeIds.remove(userId);
 
-                promise.getMembers().add(newPromiseMember);
-            }
+
+        for (Long inviteeId : inviteeIds) {
+            RoomMember roomMember = room.getMembers().stream()
+                    .filter(rm -> rm.getUser().getId().equals(inviteeId))
+                    .filter(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED)
+                    .findFirst()
+                    .orElseThrow(() -> new CustomException(ErrorCode.PROMISE_INVITEE_FORBIDDEN));
+
+            PromiseMember inviteePromiseMember = PromiseMember.create(roomMember.getUser(), promise);
+            promise.getMembers().add(inviteePromiseMember);
         }
 
         // 6. DB 저장
         Promise savedPromise = promiseRepository.save(promise);
 
         return savedPromise.getId();
+    }
+
+    /**
+     * 추천 시간 선택 기반 약속 생성
+     *
+     * 흐름:
+     * 1. 프론트가 선택한 추천 시간(selectedStartTime/selectedEndTime)을 보냄
+     * 2. 백엔드가 추천 알고리즘을 다시 실행
+     * 3. 선택한 시간이 실제 추천 결과에 있는지 확인
+     * 4. 해당 추천 결과의 availableMembers만 약속 멤버로 사용
+     * 5. 기존 createPromise()를 재사용해서 Promise 생성
+     */
+    @Transactional
+    public Long createPromiseFromRecommendation(
+            Long userId,
+            Long roomId,
+            PromiseCreateFromRecommendationRequest request
+    ) {
+        // 1. 추천 API에 넣을 요청 DTO를 다시 구성한다.
+        PromiseTimeRecommendRequest recommendRequest = new PromiseTimeRecommendRequest(
+                request.proposeStartDate(),
+                request.proposeEndDate(),
+                request.searchStartTime(),
+                request.searchEndTime(),
+                request.minDuration(),
+                request.sortType(),
+                request.selectedMemberIds()
+        );
+
+        // 2. 현재 시점 기준으로 추천 알고리즘을 다시 실행한다.
+        // 이유:
+        // - 프론트가 availableMembers를 조작해서 보내는 것을 막기 위함
+        // - 추천 조회 이후 누군가 일정을 추가/수정했을 가능성을 반영하기 위함
+        List<PromiseTimeRecommendationResponse> recommendations =
+                promiseRecommendationService.recommendPromiseTimes(
+                        userId,
+                        roomId,
+                        recommendRequest
+                );
+
+        // 3. 프론트가 선택한 시간이 실제 추천 결과 안에 있는지 확인한다.
+        PromiseTimeRecommendationResponse selectedRecommendation = recommendations.stream()
+                .filter(recommendation ->
+                        recommendation.startTime().equals(request.selectedStartTime())
+                                && recommendation.endTime().equals(request.selectedEndTime())
+                )
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_PROMISE_TIME));
+
+        // 4. 선택한 추천 시간에서 가능한 멤버만 추출한다.
+        // availableMembers에는 생성자 본인도 포함되어 있을 수 있다.
+        List<Long> availableMemberIds = selectedRecommendation.availableMembers().stream()
+                .map(member -> member.userId())
+                .distinct()
+                .toList();
+
+        // 5. 생성자가 이 시간에 가능하지 않다면 약속을 만들 수 없다.
+        if (!availableMemberIds.contains(userId)) {
+            throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
+        }
+
+        // 6. PromiseCreateRequest의 inviteeIds에는 생성자를 제외한 가능한 멤버만 넣는다.
+        // 생성자는 createPromise() 안에서 자동으로 PromiseMember에 추가되고 ACCEPTED 처리된다.
+        List<Long> inviteeIds = availableMemberIds.stream()
+                .filter(availableMemberId -> !availableMemberId.equals(userId))
+                .toList();
+
+        // 7. 가능한 상대방이 아무도 없으면 약속 생성 불가로 처리한다.
+        if (inviteeIds.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_PROMISE_MEMBER);
+        }
+
+        // 8. 기존 약속 생성 DTO로 변환한다.
+        PromiseCreateRequest createRequest = new PromiseCreateRequest(
+                request.title(),
+                request.comment(),
+                request.categoryId(),
+                request.proposeStartDate(),
+                request.proposeEndDate(),
+                selectedRecommendation.startTime(),
+                selectedRecommendation.endTime(),
+                request.location(),
+                request.notificationLeadMinutes(),
+                request.minDuration(),
+                inviteeIds
+        );
+
+        // 9. 기존 createPromise() 로직 재사용
+        return createPromise(userId, roomId, createRequest);
     }
 
     /**
@@ -312,7 +409,6 @@ public class PromiseService {
         // 3. 이미 확정된 약속은 일단 삭제를 막음
         // 이유: 확정된 약속은 각 멤버의 Schedule에 이미 등록되었을 수 있는데,
         // 현재 Schedule과 Promise를 연결하는 promise_id가 없다면 자동 삭제가 어렵다.
-        // TODO : 확정된 약속도 삭제가 가능하게 할지 안되게 할지 -> 만약 가능하게 한다면 연관된 스케줄을 다 없애야 함
         if (promise.getStatus() == PromiseStatus.CONFIRMED) {
             throw new CustomException(ErrorCode.PROMISE_ALREADY_CLOSED);
         }
@@ -341,8 +437,8 @@ public class PromiseService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PROMISE_NOT_FOUND));
 
         // 약속 생성자만 콕찌르기 가능
-        // TODO: 약속 생성자 뿐만 아니라 다른 사람도 콕찌르기 할 수 있는지 확인
-        validatePromiseSender(promise, userId);
+        // 약속 생성자 뿐만 아니라 다른 사람도 콕찌르기 할 수 있음
+        validatePromiseMember(promise, userId);
 
         // 확정/취소된 약속에는 콕찌르기 불가
         validatePromisePending(promise);
@@ -395,7 +491,6 @@ public class PromiseService {
      *
      * 생성자는 자동 참석 상태를 유지하고,
      * 나머지 멤버들은 변경된 시간에 대해 다시 응답해야 하므로 PENDING으로 변경한다.
-     * TODO : 만약 다른 필드 수정 시에도 PENDING으로 변경해야 된다면 수정 로직 고쳐야됨
      */
     private void resetMemberStatusesForTimeChange(Promise promise) {
         Long senderId = promise.getSender().getId();
@@ -413,6 +508,15 @@ public class PromiseService {
     //===================검증 메서드======================//
     private void validatePromiseSender(Promise promise, Long userId) {
         if (!promise.getSender().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.PROMISE_FORBIDDEN);
+        }
+    }
+
+    private void validatePromiseMember(Promise promise, Long userId) {
+        boolean isPromiseMember = promise.getMembers().stream()
+                .anyMatch(member -> member.getUser().getId().equals(userId));
+
+        if (!isPromiseMember) {
             throw new CustomException(ErrorCode.PROMISE_FORBIDDEN);
         }
     }

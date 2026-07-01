@@ -12,7 +12,7 @@ public record RoomListResponse(
         @JsonProperty("name") String name,
         @JsonProperty("description") String description,
         @JsonProperty("image_url") String imageUrl,
-        @JsonProperty("category_id") int totalMemberCount,
+        @JsonProperty("total_member_count") int totalMemberCount,
         List<String> memberProfileImages // 동그란 프로필 사진 최대 3개
 ) {
 
