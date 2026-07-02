@@ -154,19 +154,6 @@ public class ScheduleService {
     @Transactional(readOnly = true)
     public ScheduleResponseDto getFriendSchedules(Long myUserId, Long friendId, String view, LocalDate targetDate) {
 
-        // =====================================================================
-        // TODO: 이 부분에 Friend 도메인의 친구 확인 로직을 연결해 주세요!
-        // boolean isFriend = friendService.isFriend(myUserId, friendId);
-        // =====================================================================
-
-        // (임시) 테스트위해 무조건 친구라고 가정하고 통과
-        boolean isFriend = true;
-
-        if (!isFriend) {
-            // TODO: (에러 코드도 추가해주세요)
-            //throw new CustomException(ErrorCode.FRIEND_FORBIDDEN);
-        }
-
         List<EventDto> eventDtos = getExpandedEventDtos(friendId, myUserId, view, targetDate);
         return ScheduleResponseDto.from(eventDtos);
     }
