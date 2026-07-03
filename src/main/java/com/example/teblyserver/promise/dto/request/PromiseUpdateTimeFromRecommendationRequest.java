@@ -27,10 +27,8 @@ public record PromiseUpdateTimeFromRecommendationRequest(
         @NotNull(message = "조율 종료일은 필수입니다.")
         LocalDate proposeEndDate,
 
-        @NotNull(message = "하루 탐색 시작 시간은 필수입니다.")
         LocalTime searchStartTime,
 
-        @NotNull(message = "하루 탐색 종료 시간은 필수입니다.")
         LocalTime searchEndTime,
 
         @NotNull(message = "원본 추천 시작 시간은 필수입니다.")
@@ -51,4 +49,13 @@ public record PromiseUpdateTimeFromRecommendationRequest(
 
         PromiseTimeRecommendationSortType sortType
 ) {
+
+        public PromiseUpdateTimeFromRecommendationRequest {
+                if (searchStartTime == null) {
+                        searchStartTime = LocalTime.of(9, 0); // 기본값: 오전 9시
+                }
+                if (searchEndTime == null) {
+                        searchEndTime = LocalTime.of(22, 0); // 기본값: 오후 10시
+                }
+        }
 }

@@ -24,10 +24,8 @@ public record PromiseCreateFromRecommendationRequest(
         @NotNull(message = "조율 종료일은 필수입니다.")
         LocalDate proposeEndDate,
 
-        @NotNull(message = "하루 탐색 시작 시간은 필수입니다.")
         LocalTime searchStartTime,
 
-        @NotNull(message = "하루 탐색 종료 시간은 필수입니다.")
         LocalTime searchEndTime,
 
         // 추가: 프론트가 선택한 원래 추천 카드의 시작 시간
@@ -60,4 +58,13 @@ public record PromiseCreateFromRecommendationRequest(
         @NotEmpty(message = "추천 대상 멤버는 최소 1명 이상이어야 합니다.")
         List<@NotNull(message = "추천 대상 멤버 ID는 null일 수 없습니다.") Long> selectedMemberIds
 ) {
+
+        public PromiseCreateFromRecommendationRequest {
+                if (searchStartTime == null) {
+                        searchStartTime = LocalTime.of(9, 0); // 기본값: 오전 9시
+                }
+                if (searchEndTime == null) {
+                        searchEndTime = LocalTime.of(22, 0); // 기본값: 오후 10시
+                }
+        }
 }
