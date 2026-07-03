@@ -31,6 +31,8 @@ public class User {
 
     private String profileImageUrl;
 
+    private String bio;
+
     private String invitationCode;
 
     @CreationTimestamp
@@ -60,8 +62,9 @@ public class User {
         this.isDeleted = true;
     }
 
-    public void updateProfile(String nickname, String profileImageUrl) {
+    public void updateProfile(String nickname, String bio, String profileImageUrl) {
         if (nickname != null) this.nickname = nickname;
+        if (bio != null) this.bio = bio;
         if (profileImageUrl != null) this.profileImageUrl = profileImageUrl;
         this.isNewUser = false;
     }
