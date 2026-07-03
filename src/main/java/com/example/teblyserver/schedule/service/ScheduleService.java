@@ -55,6 +55,8 @@ public class ScheduleService {
             throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN); // "해당 카테고리에 대한 권한이 없습니다."
         }
 
+        validateScheduleTime(requestDto.startTime(),requestDto.endTime());
+
         // 3. DTO 데이터와 유저 엔티티를 조합해 Schedule 객체를 새로 생성
         Schedule schedule = Schedule.create(
                 user,
@@ -71,6 +73,18 @@ public class ScheduleService {
 
         return savedSchedule.getId();
     }
+
+
+
+    // 자기 자신 일정 조회
+
+    @Transactional(readOnly = true)
+    public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
+
+        List<EventDto> eventDtos = getExpandedEventDtos(userId, userId, view, targetDate);
+        return ScheduleResponseDto.from(eventDtos);
+    }
+
 
     private List<EventDto> getExpandedEventDtos(Long targetUserId, Long loginUserId, String view, LocalDate targetDate) {
 
@@ -138,16 +152,6 @@ public class ScheduleService {
         return resultDtos;
     }
 
-
-
-    // 자기 자신 일정 조회
-    @Transactional(readOnly = true)
-    public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
-
-        List<EventDto> eventDtos = getExpandedEventDtos(userId, userId, view, targetDate);
-        return ScheduleResponseDto.from(eventDtos);
-    }
-
     /**
      * 친구 일정 조회 (Strategy B 적용)
      */
@@ -183,6 +187,10 @@ public class ScheduleService {
                 throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN);
             }
         }
+
+        LocalDateTime newStartTime = dto.startTime() != null ? dto.startTime() : schedule.getStartTime();
+        LocalDateTime newEndTime = dto.endTime() != null ? dto.endTime() : schedule.getEndTime();
+        validateScheduleTime(newStartTime, newEndTime);
 
 
         // 4. 엔티티의 값을 변경
@@ -243,5 +251,15 @@ public class ScheduleService {
                 .toList();
 
         scheduleRepository.saveAll(schedules);
+    }
+
+    private void validateScheduleTime(LocalDateTime startTime, LocalDateTime endTime) {
+        if (startTime == null || endTime == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (!startTime.isBefore(endTime)) {
+            throw new CustomException(ErrorCode.INVALID_SCHEDULE_TIME);
+        }
     }
 }
