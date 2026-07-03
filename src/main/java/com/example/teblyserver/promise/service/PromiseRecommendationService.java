@@ -173,6 +173,29 @@ public class PromiseRecommendationService {
                 .toList();
     }
 
+    /**
+     * 결정 도우미(LLM)가 후보 슬롯 앞뒤로 촉박한 일정이 있는지 판단할 수 있도록,
+     * 주어진 시간 윈도우 안에서 유저들의 일정을 조회해 반환한다.
+     *
+     * anchorDate는 반복 일정의 실제 발생 여부를 계산할 기준 날짜다.
+     * (윈도우가 버퍼 때문에 전날/다음날로 살짝 걸치더라도, 판단 기준은 슬롯이 속한 날짜로 고정한다)
+     */
+    public List<BusyScheduleTimeRange> findExpandedSchedulesInWindow(
+            List<Long> userIds,
+            LocalDate anchorDate,
+            LocalDateTime windowStart,
+            LocalDateTime windowEnd
+    ) {
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<BusyScheduleTimeRange> rawSchedules =
+                scheduleRepository.findBusySchedulesByUserIdsAndPeriod(userIds, windowStart, windowEnd);
+
+        return expandBusySchedulesForDate(rawSchedules, anchorDate, windowStart, windowEnd);
+    }
+
     private List<RoomMember> resolveSelectedAcceptedMembers(
             Long loginUserId,
             List<RoomMember> acceptedMembers,
@@ -536,6 +559,7 @@ public class PromiseRecommendationService {
         expandedSchedules.add(
                 new BusyScheduleTimeRange(
                         schedule.userId(),
+                        schedule.title(),
                         occurrenceStart,
                         occurrenceEnd,
                         schedule.repeatType()

@@ -6,15 +6,16 @@ import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * 알고리즘(PromiseRecommendationService)이 산출한 약속 시간 후보.
- * slotId는 프론트 식별용으로 부여한다 (예: "slot-1").
- * Gemini 프롬프트용 JSON으로 직렬화되므로 LocalDateTime은 ISO-8601 문자열로 직렬화한다.
+ * 후보 슬롯 바로 앞 또는 뒤에 인접한 멤버의 개인 일정.
+ * gapMinutes: 슬롯과의 간격(분).
+ * - 직전 일정이면 "일정 종료 ~ 슬롯 시작" 사이 간격
+ * - 직후 일정이면 "슬롯 종료 ~ 일정 시작" 사이 간격
+ * 간격이 짧을수록(예: 30분 이하) 그 멤버가 슬롯에 촉박하게 참여/이탈해야 함을 의미한다.
  */
-public record CandidateSlotDto(
-        String slotId,
+public record AdjacentScheduleDto(
+        String title,
 
         @JsonSerialize(using = LocalDateTimeSerializer.class)
         @JsonDeserialize(using = LocalDateTimeDeserializer.class)
@@ -24,11 +25,6 @@ public record CandidateSlotDto(
         @JsonDeserialize(using = LocalDateTimeDeserializer.class)
         LocalDateTime endTime,
 
-        int durationMinutes,
-        boolean allAvailable,
-        int availableMemberCount,
-        int totalMemberCount,
-        List<MemberSummaryDto> availableMembers,
-        List<MemberSummaryDto> unavailableMembers
+        long gapMinutes
 ) {
 }

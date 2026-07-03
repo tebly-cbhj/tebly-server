@@ -19,21 +19,7 @@ services:
     networks:
       - app-network
 
-  # 2. Redis (결정 도우미 추천 결과 캐싱)
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
-
-  # 3. Spring Boot 애플리케이션 서비스
+  # 2. Spring Boot 애플리케이션 서비스
   app:
     build: .
     container_name: spring-app
@@ -48,12 +34,8 @@ services:
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
     depends_on:
       db:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - app-network

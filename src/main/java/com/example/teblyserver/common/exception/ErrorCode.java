@@ -43,9 +43,6 @@ public enum ErrorCode {
     PROMISE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_1", "해당 약속의 권한이 없습니다."),
     PROMISE_INVITEE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_2", "초대 대상은 방에 참여 중인 멤버만 선택할 수 있습니다."),
 
-    // decision (결정 도우미) - 4xx
-    DECISION_CACHE_NOT_FOUND(HttpStatus.NOT_FOUND, "DECISION_404_1", "결정 도우미용 추천 캐시를 찾을 수 없습니다. 추천을 먼저 실행해주세요."),
-
     // gemini (결정 도우미) - 5xx
     GEMINI_API_CALL_FAILED(HttpStatus.BAD_GATEWAY, "GEMINI_502_1", "Gemini API 호출에 실패했습니다."),
     GEMINI_RESPONSE_PARSE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "GEMINI_500_1", "Gemini 응답 파싱에 실패했습니다."),

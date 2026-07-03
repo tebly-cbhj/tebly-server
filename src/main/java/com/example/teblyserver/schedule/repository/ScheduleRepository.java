@@ -57,6 +57,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("""
         select new com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange(
             s.user.id,
+            s.title,
             s.startTime,
             s.endTime,
             s.repeatType

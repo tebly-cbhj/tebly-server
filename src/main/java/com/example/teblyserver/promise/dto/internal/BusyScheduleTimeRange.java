@@ -9,9 +9,11 @@ import java.time.LocalDateTime;
  * 누구의 일정인가?
  * 언제 시작하는가?
  * 언제 끝나는가?
+ * (title은 결정 도우미가 후보 슬롯 앞뒤 인접 일정을 사람이 알아볼 수 있게 설명할 때 사용)
  */
 public record BusyScheduleTimeRange(
         Long userId,
+        String title,
         LocalDateTime startTime,
         LocalDateTime endTime,
         RepeatType repeatType

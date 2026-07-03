@@ -25,7 +25,7 @@ spring:
             user-name-attribute: id
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/mydb
+    url: jdbc:postgresql://db:5432/mydb
     username: myuser
     password: mypassword
     driver-class-name: org.postgresql.Driver
@@ -44,10 +44,6 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
 
 clova:
   ocr:
