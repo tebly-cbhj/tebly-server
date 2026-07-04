@@ -32,11 +32,6 @@ public class Schedule {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    // TODO: OcrLog 엔티티 구현 후 주석 해제 예정
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "ocr_log_id", nullable = true)
-    // private OcrLog ocrLog;
-
     @Column(nullable = false)
     private String title;
 
@@ -55,6 +50,9 @@ public class Schedule {
 
     @Column(nullable = false)
     private boolean isDeleted = false;
+
+    @Column
+    private LocalDateTime lastNotifiedAt; // 마지막으로 알림을 보낸 시각 (반복 일정 중복 알림 방지용)
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -77,13 +75,6 @@ public class Schedule {
         return schedule;
     }
 
-    // 정적 팩토리 메서드 오버로딩 (나중에 OCR을 통해 생성할 때 쓸 생성 메서드)
-    // public static Schedule createWithOcr(User user, OcrLog ocrLog, String title, LocalDateTime startTime, LocalDateTime endTime, String repeatType) {
-    //     Schedule schedule = Schedule.create(user, title, startTime, endTime, repeatType);
-    //     schedule.ocrLog = ocrLog;
-    //     return schedule;
-    // }
-
     public void update(Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType, Integer notificationLeadMinutes) {
         if (category != null) {
             this.category = category; // 일정 수정 시 카테고리 수정 가능
@@ -105,6 +96,10 @@ public class Schedule {
 
     public void delete() {
         this.isDeleted = true;
+    }
+
+    public void updateLastNotifiedAt(LocalDateTime notifiedAt) {
+        this.lastNotifiedAt = notifiedAt;
     }
 
     // 알림이 울려야 하는 실제 시각 을 직접 계산해 주는 비즈니스 메서드를 제공
