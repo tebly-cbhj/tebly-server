@@ -125,6 +125,19 @@ public class PromiseService {
         // 6. DB 저장
         Promise savedPromise = promiseRepository.save(promise);
 
+        // 7. 초대된 멤버들에게 즉시 약속 초대 알림 발송 (약속 생성자 본인 제외)
+        for (PromiseMember member : savedPromise.getMembers()) {
+            if (!member.getUser().getId().equals(userId)) {
+                notificationService.send(
+                        member.getUser(),
+                        NotificationType.INVITATION,
+                        savedPromise.getTitle(),
+                        sender.getNickname() + "님이 약속을 제안했어요!",
+                        "/promises/" + savedPromise.getId()
+                );
+            }
+        }
+
         return savedPromise.getId();
     }
 

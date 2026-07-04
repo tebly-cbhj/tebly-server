@@ -1,15 +1,15 @@
 package com.example.teblyserver.notification.controller;
 
 import com.example.teblyserver.notification.domain.Notification;
+import com.example.teblyserver.notification.dto.NotificationInvitationResponse;
 import com.example.teblyserver.notification.service.NotificationService;
+import com.example.teblyserver.promise.dto.response.PromiseInvitationResponse;
+import com.example.teblyserver.promise.service.PromiseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import com.example.teblyserver.notification.dto.NotificationInvitationResponse;
-import com.example.teblyserver.promise.dto.response.PromiseInvitationResponse;
-import com.example.teblyserver.promise.service.PromiseService;
+
 import java.util.List;
 
 @RestController
@@ -23,8 +23,7 @@ public class NotificationController {
     // 초대 알림 목록 조회
     @GetMapping("/invitation")
     public ResponseEntity<NotificationInvitationResponse> getInvitationNotifications(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+            @AuthenticationPrincipal Long userId) {
 
         List<Notification> roomInvitations = notificationService.getInvitationNotifications(userId);
         List<PromiseInvitationResponse> promiseInvitations = promiseService.getPendingInvitations(userId);
@@ -35,8 +34,8 @@ public class NotificationController {
     // 일반 알림 목록 조회
     @GetMapping("/common")
     public ResponseEntity<List<Notification>> getCommonNotifications(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+            @AuthenticationPrincipal Long userId) {
+
         return ResponseEntity.ok(notificationService.getCommonNotifications(userId));
     }
 
