@@ -76,7 +76,6 @@ public class ScheduleService {
 
 
 
-    // 자기 자신 일정 조회
 
     @Transactional(readOnly = true)
     public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
