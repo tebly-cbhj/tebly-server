@@ -4,10 +4,10 @@ import com.example.teblyserver.auth.dto.UserProfileRequest;
 import com.example.teblyserver.auth.dto.UserProfileResponse;
 import com.example.teblyserver.auth.service.UserService;
 import com.example.teblyserver.common.response.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,7 +20,7 @@ public class UserController {
     @PatchMapping("/me")
     public ResponseEntity<ApiResponse<Void>> updateProfile(
             @AuthenticationPrincipal Long userId,
-            @RequestBody UserProfileRequest request) {
+            @Valid @RequestBody UserProfileRequest request) {
         userService.updateProfile(userId, request);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
