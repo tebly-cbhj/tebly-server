@@ -21,10 +21,9 @@ public class AppConfig {
     }
 
     /**
-     * 애플리케이션 공용 ObjectMapper.
-     * LocalDate/LocalDateTime 직렬화를 위해 JavaTimeModule을 등록하고,
-     * 날짜를 타임스탬프(숫자)가 아닌 ISO-8601 문자열로 직렬화한다.
-     * (record 바인딩 등 클래스패스의 나머지 모듈은 findAndRegisterModules로 함께 등록)
+     * decision 패키지(PromptBuilder/GeminiClient/DecisionHelperService)가 쓰는 Jackson 2 ObjectMapper.
+     * Spring Boot 4의 MVC(@RequestBody/@ResponseBody)는 Jackson 3(tools.jackson)를 쓰기 때문에,
+     * 이 Jackson 2(com.fasterxml.jackson) 타입 빈은 MVC와 완전히 별개이며 서로 간섭하지 않는다.
      */
     @Bean
     public ObjectMapper objectMapper() {

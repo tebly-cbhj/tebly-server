@@ -561,6 +561,7 @@ public class PromiseRecommendationService {
                 new BusyScheduleTimeRange(
                         schedule.userId(),
                         schedule.title(),
+                        schedule.categoryName(),
                         occurrenceStart,
                         occurrenceEnd,
                         schedule.repeatType()

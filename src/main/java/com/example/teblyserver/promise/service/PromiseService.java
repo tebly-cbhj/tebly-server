@@ -10,6 +10,7 @@ import com.example.teblyserver.promise.domain.Promise;
 import com.example.teblyserver.promise.domain.PromiseMember;
 import com.example.teblyserver.promise.domain.PromiseMemberStatus;
 import com.example.teblyserver.promise.domain.PromiseStatus;
+import com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange;
 import com.example.teblyserver.promise.dto.request.*;
 import com.example.teblyserver.promise.dto.response.PromiseDetailResponse;
 import com.example.teblyserver.promise.dto.response.PromiseInvitationResponse;
@@ -35,10 +36,15 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiFunction;
 
 @Service
 @RequiredArgsConstructor
 public class PromiseService {
+
+    // 충돌 일정이 이 카테고리들 뿐이면 "조정 가능한" 낮은 중요도로 간주한다.
+    // (실제 기본 카테고리 시드 데이터 철자가 "자기개발"이라 그대로 맞춤 — "자기계발"은 오탈자로 보임)
+    private static final Set<String> LOW_IMPORTANCE_CATEGORY_NAMES = Set.of("여가", "자기개발");
 
     private final PromiseRepository promiseRepository;
     private final RoomRepository roomRepository;
@@ -50,10 +56,29 @@ public class PromiseService {
     private final NotificationService notificationService;
 
     /**
-     * 새로운 약속 생성
+     * 새로운 약속 생성 (일반적인 경로 — 결정이를 거치지 않은 생성)
+     * 초대 메시지는 멤버 상황과 무관하게 항상 동일한 기본 문구를 사용한다.
      */
     @Transactional
     public Long createPromise(Long userId, Long roomId, PromiseCreateRequest request) {
+        return createPromiseInternal(userId, roomId, request, this::buildStandardInvitationMessage);
+    }
+
+    /**
+     * 결정이(Decision Helper)가 분석한 결과를 바탕으로 약속을 생성한다.
+     * 이 경로에서만 멤버 상황별로 다른 초대 메시지를 보낸다 (buildInvitationMessage 참고).
+     */
+    @Transactional
+    public Long createPromiseFromDecisionHelper(Long userId, Long roomId, PromiseCreateRequest request) {
+        return createPromiseInternal(userId, roomId, request, this::buildInvitationMessage);
+    }
+
+    private Long createPromiseInternal(
+            Long userId,
+            Long roomId,
+            PromiseCreateRequest request,
+            BiFunction<Promise, User, String> invitationMessageBuilder
+    ) {
 
         // 1. 필요한 엔티티들 조회 (유저, 방)
         User sender = userRepository.findById(userId)
@@ -132,13 +157,51 @@ public class PromiseService {
                         member.getUser(),
                         NotificationType.INVITATION,
                         savedPromise.getTitle(),
-                        sender.getNickname() + "님이 약속을 제안했어요!",
+                        invitationMessageBuilder.apply(savedPromise, member.getUser()),
                         "/promises/" + savedPromise.getId()
                 );
             }
         }
 
         return savedPromise.getId();
+    }
+
+    // 결정이를 거치지 않은 일반 약속 생성 시 사용하는 기본 초대 메시지
+    private String buildStandardInvitationMessage(Promise promise, User invitee) {
+        return promise.getSender().getNickname() + "님이 약속을 제안했어요!";
+    }
+
+    /**
+     * 결정이(Decision Helper)를 통해 생성된 약속에서만 사용하는, 멤버의 상황에 따라 다른 초대 메시지.
+     *
+     * 1. 해당 시간에 충돌하는 일정이 전혀 없으면 → 일반 제안 메시지
+     * 2. 충돌하는 일정이 있지만 전부 낮은 중요도 카테고리(여가/자기개발 등)라면 → 조정 가능한지 물어보는 메시지
+     * 3. 그 외(충돌 일정이 하나라도 낮은 중요도가 아니면) → 참석이 어려울 수 있다는 메시지
+     *
+     * 세 경우 모두 PromiseMember는 동일하게 PENDING으로 생성되어, 수락/거절 자체는 똑같이 가능하다.
+     * 메시지만 상황에 맞게 달라진다.
+     */
+    private String buildInvitationMessage(Promise promise, User invitee) {
+        List<BusyScheduleTimeRange> conflicts = promiseRecommendationService.findExpandedSchedulesInWindow(
+                List.of(invitee.getId()),
+                promise.getStartTime().toLocalDate(),
+                promise.getStartTime(),
+                promise.getEndTime()
+        );
+
+        if (conflicts.isEmpty()) {
+            return "이 시간으로 약속이 제안되었어요";
+        }
+
+        boolean allConflictsLowImportance = conflicts.stream()
+                .allMatch(conflict -> LOW_IMPORTANCE_CATEGORY_NAMES.contains(conflict.categoryName()));
+
+        if (allConflictsLowImportance) {
+            String conflictTitle = conflicts.get(0).title();
+            return "이 시간에 '" + conflictTitle + "' 일정이 있는데 조정이 가능할까요?";
+        }
+
+        return "이 시간은 참석이 어려울 수 있어요";
     }
 
     /**

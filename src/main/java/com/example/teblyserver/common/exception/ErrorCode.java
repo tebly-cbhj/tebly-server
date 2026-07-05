@@ -51,6 +51,7 @@ public enum ErrorCode {
     // gemini (결정 도우미) - 5xx
     GEMINI_API_CALL_FAILED(HttpStatus.BAD_GATEWAY, "GEMINI_502_1", "Gemini API 호출에 실패했습니다."),
     GEMINI_RESPONSE_PARSE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "GEMINI_500_1", "Gemini 응답 파싱에 실패했습니다."),
+    NO_CANDIDATE_AVAILABLE(HttpStatus.INTERNAL_SERVER_ERROR, "GEMINI_500_2", "추천 후보가 존재하지 않아 결정 도우미 응답을 만들 수 없습니다."),
 
     // OCR - 5xx
     OCR_API_CALL_FAILED(HttpStatus.BAD_GATEWAY, "OCR_502_1", "OCR API 호출에 실패했습니다."),
