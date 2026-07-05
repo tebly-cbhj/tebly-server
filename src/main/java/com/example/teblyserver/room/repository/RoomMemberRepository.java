@@ -15,6 +15,8 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, Long> {
     @Query("SELECT rm.room FROM RoomMember rm WHERE rm.user.id = :userId AND rm.inviteStatus = :status AND rm.room.isDeleted = false")
     List<Room> findRoomsByUserIdAndInviteStatus(@Param("userId") Long userId, @Param("status") InviteStatus status);
 
+    boolean existsByRoomIdAndUserIdAndInviteStatus(Long roomId, Long userId, InviteStatus status);
+
     // 특정 방에서 특정 유저의 삭제되지 않은 RoomMember 목록 조회 (상태 무관, 중복 레코드 가능성 대비 List)
     List<RoomMember> findByRoomIdAndUserIdAndIsDeletedFalse(Long roomId, Long userId);
 
