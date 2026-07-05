@@ -8,16 +8,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 
 public record EventDto(
-        @JsonProperty("event_id") Long eventId,
+        Long eventId,
 
-        @JsonProperty("category")
         CategoryResponseDto category,
 
         String title,
-        @JsonProperty("start_at") LocalDateTime startAt,
-        @JsonProperty("end_at") LocalDateTime endAt,
-        @JsonProperty("repeat_type") RepeatType repeatType,
-        @JsonProperty("notification_lead_minutes") Integer notificationLeadMinutes
+        LocalDateTime startAt,
+        LocalDateTime endAt,
+        RepeatType repeatType,
+        Integer notificationLeadMinutes
 ) {
     // 엔티티 객체를 DTO로 편하게 변환하기 위한 정적 팩토리 메서드
     public static EventDto from(Schedule schedule, Long loginUserId) {

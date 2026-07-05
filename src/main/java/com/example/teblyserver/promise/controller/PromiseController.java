@@ -18,21 +18,6 @@ public class PromiseController {
     private final PromiseService promiseService;
 
     /**
-     * 약속 생성 API
-     * URL: POST /rooms/{roomId}/promises
-     */
-    @PostMapping("/rooms/{roomId}/promises")
-    public ResponseEntity<ApiResponse<Long>> createPromise(
-            @AuthenticationPrincipal Long userId,
-            @PathVariable Long roomId,
-            @Valid @RequestBody PromiseCreateRequest request
-    ) {
-        Long promiseId = promiseService.createPromise(userId, roomId, request);
-
-        return ResponseEntity.ok(ApiResponse.success("약속이 성공적으로 생성되었습니다.", promiseId));
-    }
-
-    /**
      * 추천 시간 선택 기반 약속 생성 API
      *
      * URL: POST /rooms/{roomId}/promises/from-recommendation
