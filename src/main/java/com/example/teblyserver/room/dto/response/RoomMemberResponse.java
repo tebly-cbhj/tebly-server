@@ -7,9 +7,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 
 public record RoomMemberResponse(
-        @JsonProperty("user_id") Long userId,
+        Long userId,
         String nickname,
-        @JsonProperty("profile_image") String profileImage,
+        String profileImage,
         RoomRole role,
         LocalDateTime createdAt
 ) {

@@ -8,11 +8,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 public record RoomListResponse(
-        @JsonProperty("room_id") Long roomId,
-        @JsonProperty("name") String name,
-        @JsonProperty("description") String description,
-        @JsonProperty("image_url") String imageUrl,
-        @JsonProperty("total_member_count") int totalMemberCount,
+        Long roomId,
+        String name,
+        String description,
+        String imageUrl,
+        int totalMemberCount,
         List<String> memberProfileImages // 동그란 프로필 사진 최대 3개
 ) {
 

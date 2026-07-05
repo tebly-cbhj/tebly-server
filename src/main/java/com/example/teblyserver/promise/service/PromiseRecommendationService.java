@@ -166,9 +166,9 @@ public class PromiseRecommendationService {
 
         // 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
         return candidatePool.stream()
+                .filter(candidate -> isHostAvailable(candidate, userId))
                 .sorted(getFinalRecommendationComparator(request.sortType(),
                         now,
-                        userId,
                         busySchedules))
                 .limit(RESPONSE_RECOMMENDATION_COUNT)
                 .toList();
@@ -1052,7 +1052,6 @@ public class PromiseRecommendationService {
     private Comparator<PromiseTimeRecommendationResponse> getFinalRecommendationComparator(
             PromiseTimeRecommendationSortType sortType,
             LocalDateTime now,
-            Long hostId,
             List<BusyScheduleTimeRange> busySchedules
     ) {
         PromiseTimeRecommendationSortType effectiveSortType =
@@ -1070,7 +1069,6 @@ public class PromiseRecommendationService {
                                     calculateRecommendationScore(
                                             recommendation,
                                             now,
-                                            hostId,
                                             busySchedules
                                     ),
                             Comparator.reverseOrder()
@@ -1132,29 +1130,25 @@ public class PromiseRecommendationService {
 
     /**
      * 추천 점수 =
-     * 참여도 점수 50점
+     * 참여도 점수 55점
      * + 시간대 선호도 20점
      * + 약속까지의 여유 기간 15점
      * + 일정 인접성 10점
-     * + 생성자 참석 여부 5점
      */
     private int calculateRecommendationScore(
             PromiseTimeRecommendationResponse recommendation,
             LocalDateTime now,
-            Long hostId,
             List<BusyScheduleTimeRange> busySchedules
     ) {
         int participationScore = calculateParticipationScore(recommendation);
         int timePreferenceScore = calculateTimePreferenceScore(recommendation);
         int leadTimeScore = calculateLeadTimeScore(recommendation, now);
         int adjacencyScore = calculateAdjacencyScore(recommendation, busySchedules);
-        int hostAvailabilityScore = calculateHostAvailabilityScore(recommendation, hostId);
 
         return participationScore
                 + timePreferenceScore
                 + leadTimeScore
-                + adjacencyScore
-                + hostAvailabilityScore;
+                + adjacencyScore;
     }
 
     // 참여도 점수 메서드
@@ -1166,7 +1160,7 @@ public class PromiseRecommendationService {
             return 0;
         }
 
-        return recommendation.availableMemberCount() * 50 / recommendation.totalMemberCount();
+        return recommendation.availableMemberCount() * 55 / recommendation.totalMemberCount();
     }
 
     // 시간대 선호도 점수 메서드
@@ -1357,17 +1351,6 @@ public class PromiseRecommendationService {
         }
 
         return 5;
-    }
-
-    // 생성자 참석 여부 점수 메서드
-    private int calculateHostAvailabilityScore(
-            PromiseTimeRecommendationResponse recommendation,
-            Long hostId
-    ) {
-        boolean hostAvailable = recommendation.availableMembers().stream()
-                .anyMatch(member -> member.userId().equals(hostId));
-
-        return hostAvailable ? 5 : 0;
     }
 
 
@@ -1561,5 +1544,13 @@ public class PromiseRecommendationService {
         if (promise.getStatus() != PromiseStatus.PENDING) {
             throw new CustomException(ErrorCode.PROMISE_ALREADY_CLOSED);
         }
+    }
+
+    private boolean isHostAvailable(
+            PromiseTimeRecommendationResponse recommendation,
+            Long hostId
+    ) {
+        return recommendation.availableMembers().stream()
+                .anyMatch(member -> member.userId().equals(hostId));
     }
 }
