@@ -21,7 +21,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        user.updateProfile(request.getNickname(), request.getProfileImageUrl());
+        user.updateProfile(request.getNickname(), request.getBio(), request.getProfileImageUrl());
     }
 
     public UserProfileResponse getMyProfile(Long userId) {

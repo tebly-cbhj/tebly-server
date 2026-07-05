@@ -18,6 +18,7 @@ public enum ErrorCode {
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "USER_409_1", "이미 사용 중인 닉네임입니다."),
     SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "SCHEDULE_404_1", "해당 일정을 찾을 수 없습니다."),
     SCHEDULE_FORBIDDEN(HttpStatus.FORBIDDEN, "SCHEDULE_403_1", "해당 일정을 수정/삭제할 권한이 없습니다."),
+    INVALID_SCHEDULE_TIME(HttpStatus.BAD_REQUEST, "SCHEDULE_400_1", "일정 시간이 올바르지 않습니다."),
 
     // OCR - 4xx
     OCR_EMPTY_FILE(HttpStatus.BAD_REQUEST, "OCR_400_1", "파일이 비어있습니다."),
@@ -27,6 +28,10 @@ public enum ErrorCode {
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "ROOM_404_1", "존재하지 않는 방입니다."),
     ROOM_FORBIDDEN(HttpStatus.FORBIDDEN, "ROOM_403_1", "해당 방에 접근할 권한이 없습니다."),
     HOST_CANNOT_LEAVE_ROOM(HttpStatus.BAD_REQUEST, "ROOM_400_1", "방장은 방을 나갈 수 없습니다."),
+
+    // chat - 4xx
+    CHAT_ROOM_MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "CHAT_403_1", "해당 채팅방에 속한 멤버가 아닙니다."),
+    CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_404_1", "존재하지 않는 메시지입니다."),
 
     // notification - 4xx
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404_1", "존재하지 않는 알림입니다."),

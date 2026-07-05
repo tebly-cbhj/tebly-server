@@ -137,6 +137,14 @@ public class ScheduleOcrService {
                     if (!category.getUser().getId().equals(userId)) {
                         throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN);
                     }
+
+                    if (item.getStartTime() == null || item.getEndTime() == null) {
+                        throw new CustomException(ErrorCode.INVALID_INPUT);
+                    }
+
+                    if (!item.getStartTime().isBefore(item.getEndTime())) {
+                        throw new CustomException(ErrorCode.INVALID_SCHEDULE_TIME);
+                    }
                     return Schedule.create(
                             user,
                             category,

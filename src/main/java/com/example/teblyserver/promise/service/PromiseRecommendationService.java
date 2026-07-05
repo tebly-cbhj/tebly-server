@@ -22,10 +22,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -91,7 +90,6 @@ public class PromiseRecommendationService {
                 .toList();
 
         // request로 넘어온 시작 날짜, 끝 날짜, 시간대를 바탕으로 LocalDateTime 만듦
-        // TODO: 만약 searchStartTime과 searchEndTime이 request를 타고 넘어오는 것이 아니라면 helper 메서드를 만들어서 생성해줘야될듯
         LocalDateTime searchPeriodStart =
                 request.proposeStartDate().atTime(request.searchStartTime());
 
@@ -168,7 +166,10 @@ public class PromiseRecommendationService {
 
         // 5. 전원 가능 후보와 충돌 최소 후보를 함께 정렬한 뒤 최종 5개 반환
         return candidatePool.stream()
-                .sorted(getFinalRecommendationComparator(request.sortType()))
+                .sorted(getFinalRecommendationComparator(request.sortType(),
+                        now,
+                        userId,
+                        busySchedules))
                 .limit(RESPONSE_RECOMMENDATION_COUNT)
                 .toList();
     }
@@ -1073,12 +1074,41 @@ public class PromiseRecommendationService {
     // 추천 후보군에는 전원 가능 후보와 충돌 최소 후보가 섞여 있을 수 있다.
     // 따라서 정렬 시 availableMemberCount도 보조 기준으로 넣어준다.
     private Comparator<PromiseTimeRecommendationResponse> getFinalRecommendationComparator(
-            PromiseTimeRecommendationSortType sortType
+            PromiseTimeRecommendationSortType sortType,
+            LocalDateTime now,
+            Long hostId,
+            List<BusyScheduleTimeRange> busySchedules
     ) {
         PromiseTimeRecommendationSortType effectiveSortType =
-                sortType == null ? PromiseTimeRecommendationSortType.EARLIEST : sortType;
+                sortType == null ? PromiseTimeRecommendationSortType.RECOMMENDED : sortType;
 
         return switch (effectiveSortType) {
+            // 추천순
+            // 1순위: 추천 점수 높은 순
+            // 2순위: 참여 가능 멤버 수 많은 순
+            // 3순위: 빠른 시간순
+            // 4순위: 긴 시간순
+            case RECOMMENDED -> Comparator
+                    .comparing(
+                            (PromiseTimeRecommendationResponse recommendation) ->
+                                    calculateRecommendationScore(
+                                            recommendation,
+                                            now,
+                                            hostId,
+                                            busySchedules
+                                    ),
+                            Comparator.reverseOrder()
+                    )
+                    .thenComparing(
+                            PromiseTimeRecommendationResponse::availableMemberCount,
+                            Comparator.reverseOrder()
+                    )
+                    .thenComparing(PromiseTimeRecommendationResponse::startTime)
+                    .thenComparing(
+                            PromiseTimeRecommendationResponse::durationMinutes,
+                            Comparator.reverseOrder()
+                    );
+
             // 빠른 시간순
             // 시간이 같으면 가능한 멤버 수가 많은 후보 우선
             // 그래도 같으면 더 긴 후보 우선
@@ -1122,6 +1152,246 @@ public class PromiseRecommendationService {
                     )
                     .thenComparing(PromiseTimeRecommendationResponse::startTime);
         };
+    }
+
+    /**
+     * 추천 점수 =
+     * 참여도 점수 50점
+     * + 시간대 선호도 20점
+     * + 약속까지의 여유 기간 15점
+     * + 일정 인접성 10점
+     * + 생성자 참석 여부 5점
+     */
+    private int calculateRecommendationScore(
+            PromiseTimeRecommendationResponse recommendation,
+            LocalDateTime now,
+            Long hostId,
+            List<BusyScheduleTimeRange> busySchedules
+    ) {
+        int participationScore = calculateParticipationScore(recommendation);
+        int timePreferenceScore = calculateTimePreferenceScore(recommendation);
+        int leadTimeScore = calculateLeadTimeScore(recommendation, now);
+        int adjacencyScore = calculateAdjacencyScore(recommendation, busySchedules);
+        int hostAvailabilityScore = calculateHostAvailabilityScore(recommendation, hostId);
+
+        return participationScore
+                + timePreferenceScore
+                + leadTimeScore
+                + adjacencyScore
+                + hostAvailabilityScore;
+    }
+
+    // 참여도 점수 메서드
+    private int calculateParticipationScore(
+            PromiseTimeRecommendationResponse recommendation
+    ) {
+        if (recommendation.totalMemberCount() == null
+                || recommendation.totalMemberCount() == 0) {
+            return 0;
+        }
+
+        return recommendation.availableMemberCount() * 50 / recommendation.totalMemberCount();
+    }
+
+    // 시간대 선호도 점수 메서드
+    // 평일 18:00 ~ 21:00 → 20점
+    // 주말 11:00 ~ 18:00 → 20점
+    // 평일 12:00 ~ 18:00 → 10점
+    // 그 외 이른 아침, 새벽, 심야 → 0점
+    private int calculateTimePreferenceScore(
+            PromiseTimeRecommendationResponse recommendation
+    ) {
+        LocalDateTime startTime = recommendation.startTime();
+        LocalTime start = startTime.toLocalTime();
+
+        boolean isWeekend =
+                startTime.getDayOfWeek() == DayOfWeek.SATURDAY
+                        || startTime.getDayOfWeek() == DayOfWeek.SUNDAY;
+
+        // 주말 낮/오후 선호
+        if (isWeekend) {
+            if (!start.isBefore(LocalTime.of(11, 0))
+                    && start.isBefore(LocalTime.of(18, 0))) {
+                return 20;
+            }
+
+            // 주말이지만 너무 이르거나 늦지 않은 시간
+            if (!start.isBefore(LocalTime.of(9, 0))
+                    && start.isBefore(LocalTime.of(21, 0))) {
+                return 10;
+            }
+
+            return 0;
+        }
+
+        // 평일 퇴근 후 선호
+        if (!start.isBefore(LocalTime.of(18, 0))
+                && start.isBefore(LocalTime.of(21, 0))) {
+            return 20;
+        }
+
+        // 평일 낮 시간
+        if (!start.isBefore(LocalTime.of(12, 0))
+                && start.isBefore(LocalTime.of(18, 0))) {
+            return 10;
+        }
+
+        return 0;
+    }
+
+    // 약속까지의 여유 기간 점수 메서드
+    // 3일 후 ~ 10일 후 → 15점
+    // 24시간 이내 ~ 2일 이내 → 5점
+    // 14일 이상 이후 → 5점
+    // 그 외 → 0점
+    private int calculateLeadTimeScore(
+            PromiseTimeRecommendationResponse recommendation,
+            LocalDateTime now
+    ) {
+        long hoursUntilPromise =
+                Duration.between(now, recommendation.startTime()).toHours();
+
+        long daysUntilPromise = hoursUntilPromise / 24;
+
+        if (daysUntilPromise >= 3 && daysUntilPromise <= 10) {
+            return 15;
+        }
+
+        if (hoursUntilPromise >= 24 && daysUntilPromise <= 2) {
+            return 5;
+        }
+
+        if (daysUntilPromise >= 11 && daysUntilPromise <= 13) {
+            return 10;
+        }
+
+
+        if (daysUntilPromise >= 14) {
+            return 5;
+        }
+
+        return 0;
+    }
+
+    // 일정 인접성 점수 메서드
+    /*
+        A의 최고 gap 점수 = 10점
+        B의 최고 gap 점수 = 5점
+        C의 최고 gap 점수 = 0점
+
+        인접성 점수 = (10 + 5 + 0) / 3 = 5점
+     */
+    private int calculateAdjacencyScore(
+            PromiseTimeRecommendationResponse recommendation,
+            List<BusyScheduleTimeRange> busySchedules
+    ) {
+        Set<Long> availableMemberIds = recommendation.availableMembers().stream()
+                .map(PromiseRecommendationMemberResponse::userId)
+                .collect(Collectors.toSet());
+
+        if (availableMemberIds.isEmpty()) {
+            return 0;
+        }
+
+        LocalDate recommendationDate = recommendation.startTime().toLocalDate();
+
+        LocalDateTime dayStart = recommendationDate.atStartOfDay();
+        LocalDateTime dayEnd = dayStart.plusDays(1);
+
+        List<BusyScheduleTimeRange> expandedSchedules =
+                expandBusySchedulesForDate(
+                        busySchedules,
+                        recommendationDate,
+                        dayStart,
+                        dayEnd
+                );
+
+        int totalScore = 0;
+
+        for (Long memberId : availableMemberIds) {
+            int memberBestGapScore = calculateMemberBestGapScore(
+                    memberId,
+                    recommendation,
+                    expandedSchedules
+            );
+
+            totalScore += memberBestGapScore;
+        }
+
+        return totalScore / availableMemberIds.size();
+    }
+
+    private int calculateMemberBestGapScore(
+            Long memberId,
+            PromiseTimeRecommendationResponse recommendation,
+            List<BusyScheduleTimeRange> expandedSchedules
+    ) {
+        return expandedSchedules.stream()
+                .filter(schedule -> schedule.userId().equals(memberId))
+                .mapToInt(schedule -> calculateGapScore(recommendation, schedule))
+                .max()
+                .orElse(10);
+    }
+
+    private int calculateGapScore(
+            PromiseTimeRecommendationResponse recommendation,
+            BusyScheduleTimeRange schedule
+    ) {
+        int beforeGapScore = calculateSingleGapScore(
+                schedule.endTime(),
+                recommendation.startTime()
+        );
+
+        int afterGapScore = calculateSingleGapScore(
+                recommendation.endTime(),
+                schedule.startTime()
+        );
+
+        return Math.max(beforeGapScore, afterGapScore);
+    }
+
+    private int calculateSingleGapScore(
+            LocalDateTime firstEnd,
+            LocalDateTime secondStart
+    ) {
+        if (firstEnd.isAfter(secondStart)) {
+            return 0;
+        }
+
+        long gapMinutes = Duration.between(firstEnd, secondStart).toMinutes();
+
+        // 30분 ~ 60분: 이동/준비 시간이 있어서 가장 좋음
+        if (gapMinutes >= 30 && gapMinutes <= 60) {
+            return 10;
+        }
+
+        // 15분 ~ 30분: 가능은 하지만 조금 빠듯함
+        if (gapMinutes >= 15 && gapMinutes < 30) {
+            return 7;
+        }
+
+        // 0분 ~ 15분: 너무 붙어 있어서 이동/준비 시간이 부족함
+        if (gapMinutes >= 0 && gapMinutes < 15) {
+            return 3;
+        }
+
+        // 60분 ~ 90분: 나쁘진 않지만 애매하게 뜸
+        if (gapMinutes > 60 && gapMinutes <= 90) {
+            return 5;
+        }
+
+        return 5;
+    }
+
+    // 생성자 참석 여부 점수 메서드
+    private int calculateHostAvailabilityScore(
+            PromiseTimeRecommendationResponse recommendation,
+            Long hostId
+    ) {
+        boolean hostAvailable = recommendation.availableMembers().stream()
+                .anyMatch(member -> member.userId().equals(hostId));
+
+        return hostAvailable ? 5 : 0;
     }
 
 

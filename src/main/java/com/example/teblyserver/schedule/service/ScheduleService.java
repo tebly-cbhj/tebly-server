@@ -55,6 +55,8 @@ public class ScheduleService {
             throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN); // "해당 카테고리에 대한 권한이 없습니다."
         }
 
+        validateScheduleTime(requestDto.startTime(),requestDto.endTime());
+
         // 3. DTO 데이터와 유저 엔티티를 조합해 Schedule 객체를 새로 생성
         Schedule schedule = Schedule.create(
                 user,
@@ -71,6 +73,17 @@ public class ScheduleService {
 
         return savedSchedule.getId();
     }
+
+
+
+
+    @Transactional(readOnly = true)
+    public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
+
+        List<EventDto> eventDtos = getExpandedEventDtos(userId, userId, view, targetDate);
+        return ScheduleResponseDto.from(eventDtos);
+    }
+
 
     private List<EventDto> getExpandedEventDtos(Long targetUserId, Long loginUserId, String view, LocalDate targetDate) {
 
@@ -138,34 +151,11 @@ public class ScheduleService {
         return resultDtos;
     }
 
-
-
-    // 자기 자신 일정 조회
-    @Transactional(readOnly = true)
-    public ScheduleResponseDto getSchedules(Long userId, String view, LocalDate targetDate) {
-
-        List<EventDto> eventDtos = getExpandedEventDtos(userId, userId, view, targetDate);
-        return ScheduleResponseDto.from(eventDtos);
-    }
-
     /**
      * 친구 일정 조회 (Strategy B 적용)
      */
     @Transactional(readOnly = true)
     public ScheduleResponseDto getFriendSchedules(Long myUserId, Long friendId, String view, LocalDate targetDate) {
-
-        // =====================================================================
-        // TODO: 이 부분에 Friend 도메인의 친구 확인 로직을 연결해 주세요!
-        // boolean isFriend = friendService.isFriend(myUserId, friendId);
-        // =====================================================================
-
-        // (임시) 테스트위해 무조건 친구라고 가정하고 통과
-        boolean isFriend = true;
-
-        if (!isFriend) {
-            // TODO: (에러 코드도 추가해주세요)
-            //throw new CustomException(ErrorCode.FRIEND_FORBIDDEN);
-        }
 
         List<EventDto> eventDtos = getExpandedEventDtos(friendId, myUserId, view, targetDate);
         return ScheduleResponseDto.from(eventDtos);
@@ -196,6 +186,10 @@ public class ScheduleService {
                 throw new CustomException(ErrorCode.CATEGORY_FORBIDDEN);
             }
         }
+
+        LocalDateTime newStartTime = dto.startTime() != null ? dto.startTime() : schedule.getStartTime();
+        LocalDateTime newEndTime = dto.endTime() != null ? dto.endTime() : schedule.getEndTime();
+        validateScheduleTime(newStartTime, newEndTime);
 
 
         // 4. 엔티티의 값을 변경
@@ -256,5 +250,15 @@ public class ScheduleService {
                 .toList();
 
         scheduleRepository.saveAll(schedules);
+    }
+
+    private void validateScheduleTime(LocalDateTime startTime, LocalDateTime endTime) {
+        if (startTime == null || endTime == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (!startTime.isBefore(endTime)) {
+            throw new CustomException(ErrorCode.INVALID_SCHEDULE_TIME);
+        }
     }
 }
