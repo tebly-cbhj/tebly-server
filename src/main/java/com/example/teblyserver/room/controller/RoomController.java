@@ -1,10 +1,7 @@
 package com.example.teblyserver.room.controller;
 
 import com.example.teblyserver.common.response.ApiResponse;
-import com.example.teblyserver.room.dto.request.RoomCreateRequest;
-import com.example.teblyserver.room.dto.request.RoomMemberInviteRequest;
-import com.example.teblyserver.room.dto.request.RoomMemberKickRequest;
-import com.example.teblyserver.room.dto.request.RoomUpdateRequest;
+import com.example.teblyserver.room.dto.request.*;
 import com.example.teblyserver.room.dto.response.RoomDetailResponse;
 import com.example.teblyserver.room.dto.response.RoomListResponse;
 import com.example.teblyserver.room.dto.response.RoomMemberResponse;
@@ -158,4 +155,19 @@ public class RoomController {
 
         return ResponseEntity.ok(ApiResponse.success("방에서 나갔습니다.", null));
     }
+
+    /**
+     * 방 초대 수락 및 거절 API
+     * URL: PATCH /rooms/{roomId}/members/me/respond
+     */
+    @PatchMapping("/{roomId}/members/me/respond")
+    public ResponseEntity<ApiResponse<Void>> respondRoomInvitation(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long roomId,
+            @Valid @RequestBody RoomMemberRespondRequest request
+    ) {
+        roomService.respondRoomInvitation(userId, roomId, request);
+        return ResponseEntity.ok(ApiResponse.success("초대 응답이 처리되었습니다.", null));
+    }
+
 }

@@ -12,10 +12,7 @@ import com.example.teblyserver.room.domain.InviteStatus;
 import com.example.teblyserver.room.domain.Room;
 import com.example.teblyserver.room.domain.RoomMember;
 import com.example.teblyserver.room.domain.RoomRole;
-import com.example.teblyserver.room.dto.request.RoomCreateRequest;
-import com.example.teblyserver.room.dto.request.RoomMemberInviteRequest;
-import com.example.teblyserver.room.dto.request.RoomMemberKickRequest;
-import com.example.teblyserver.room.dto.request.RoomUpdateRequest;
+import com.example.teblyserver.room.dto.request.*;
 import com.example.teblyserver.room.dto.response.RoomDetailResponse;
 import com.example.teblyserver.room.dto.response.RoomListResponse;
 import com.example.teblyserver.room.dto.response.RoomMemberResponse;
@@ -290,4 +287,34 @@ public class RoomService {
 
         member.delete();
     }
+
+    /**
+     * 방 초대 수락 및 거절 처리
+     */
+    @Transactional
+    public void respondRoomInvitation(Long userId, Long roomId, RoomMemberRespondRequest request) {
+        // 1. 해당 방이 존재하는지 검증
+        roomRepository.findById(roomId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
+        // 2. 해당 유저가 이 방에 PENDING 상태의 멤버로 속해 있는지 조회
+        RoomMember roomMember =
+                roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
+                        .stream()
+                        .filter(rm -> rm.getInviteStatus() == InviteStatus.PENDING)
+                        .findFirst()
+                        .orElseThrow(() -> new CustomException(ErrorCode.ROOM_FORBIDDEN));
+// 초대를 받지 않았거나 이미 수락/거절한 상태인 경우
+        // 3. 응답 값에 따른 처리
+        if (request.status() == InviteStatus.ACCEPTED) {
+            // 초대 수락: 상태를 ACCEPTED로 갱신
+            roomMember.acceptInvitation();
+        } else if (request.status() == InviteStatus.REJECTED) {
+            // 초대 거절: Soft Delete 처리하거나 거절 상태 기록 후 보관
+            roomMember.rejectInvitation();
+            roomMember.delete();
+        } else {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+    }
+
 }
