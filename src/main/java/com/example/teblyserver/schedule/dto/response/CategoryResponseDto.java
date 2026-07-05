@@ -4,11 +4,11 @@ import com.example.teblyserver.schedule.domain.Category;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public record CategoryResponseDto(
-        @JsonProperty("category_id") Long categoryId,
-        @JsonProperty("category_name") String categoryName,
-        @JsonProperty("category_icon") String categoryIcon,
+        Long categoryId,
+         String categoryName,
+         String categoryIcon,
         // 프론트엔드가 "비공개인 카테고리"를 표시해주기 위해 추가
-        @JsonProperty("is_private") boolean isPrivate
+         boolean isPrivate
 ) {
     // 마스킹 여부(isMasked)를 파라미터로 받아서 알아서 변환해 주는 팩토리 메서드
     public static CategoryResponseDto of(Category category, boolean isMasked) {

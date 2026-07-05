@@ -11,7 +11,6 @@ public record CategoryCreateRequestDto(
         @NotNull(message = "아이콘은 필수입니다.")
         String icon,
 
-        @JsonProperty("is_private")
         boolean isPrivate
 ) {
 }

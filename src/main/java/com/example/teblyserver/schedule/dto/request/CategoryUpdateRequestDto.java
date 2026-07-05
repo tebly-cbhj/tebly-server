@@ -6,6 +6,6 @@ public record CategoryUpdateRequestDto(
         String name,
         String icon,
         // null 허용
-        @JsonProperty("is_private") Boolean isPrivate
+        Boolean isPrivate
 ) {
 }
