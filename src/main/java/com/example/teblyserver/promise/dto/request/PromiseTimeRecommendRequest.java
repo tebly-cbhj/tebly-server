@@ -25,7 +25,7 @@ public record PromiseTimeRecommendRequest(
         Integer minDuration,
 
         //sortType은 필수로 안 둬도 됨
-        //안 보내면 기본값을 EARLIEST로 처리
+        //안 보내면 기본값을 RECOMMENDED로 처리
         PromiseTimeRecommendationSortType sortType,
 
         @NotEmpty(message = "추천 대상 멤버는 최소 1명 이상이어야 합니다.")
@@ -34,10 +34,10 @@ public record PromiseTimeRecommendRequest(
 
         public PromiseTimeRecommendRequest {
                 if (searchStartTime == null) {
-                        searchStartTime = LocalTime.of(9, 0); // 기본값: 오전 9시
+                        searchStartTime = LocalTime.of(8, 0); // 기본값: 오전 8시
                 }
                 if (searchEndTime == null) {
-                        searchEndTime = LocalTime.of(22, 0); // 기본값: 오후 10시
+                        searchEndTime = LocalTime.of(23, 59); // 기본값: 오후 23시 59분
                 }
         }
 }
