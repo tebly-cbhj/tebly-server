@@ -54,8 +54,13 @@ public class User {
         user.oauthId = oauthId;
         user.nickname = nickname;
         user.profileImageUrl = profileImageUrl;
-        user.invitationCode = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        user.invitationCode = generateNumericInvitationCode();
         return user;
+    }
+
+    private static String generateNumericInvitationCode() {
+        int code = (int) (Math.random() * 1_000_000); // 0 ~ 999999
+        return String.format("%06d", code); // 6자리
     }
 
     public void softDelete() {
