@@ -48,6 +48,11 @@ public enum ErrorCode {
     PROMISE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_1", "해당 약속의 권한이 없습니다."),
     PROMISE_INVITEE_FORBIDDEN(HttpStatus.FORBIDDEN, "PROMISE_403_2", "초대 대상은 방에 참여 중인 멤버만 선택할 수 있습니다."),
 
+    // gemini (결정 도우미) - 5xx
+    GEMINI_API_CALL_FAILED(HttpStatus.BAD_GATEWAY, "GEMINI_502_1", "Gemini API 호출에 실패했습니다."),
+    GEMINI_RESPONSE_PARSE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "GEMINI_500_1", "Gemini 응답 파싱에 실패했습니다."),
+    NO_CANDIDATE_AVAILABLE(HttpStatus.INTERNAL_SERVER_ERROR, "GEMINI_500_2", "추천 후보가 존재하지 않아 결정 도우미 응답을 만들 수 없습니다."),
+
     // OCR - 5xx
     OCR_API_CALL_FAILED(HttpStatus.BAD_GATEWAY, "OCR_502_1", "OCR API 호출에 실패했습니다."),
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CATEGORY_404_1", "존재하지 않는 카테고리입니다."),

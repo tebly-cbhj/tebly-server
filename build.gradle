@@ -43,6 +43,8 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+    // Gemini API 호출용 HTTP 클라이언트 (jackson-databind은 spring-boot-starter-webmvc에 포함되어 별도 추가 불필요)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
 
 

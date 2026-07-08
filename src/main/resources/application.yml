@@ -44,10 +44,17 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
+
 clova:
   ocr:
     api-url: ${CLOVA_OCR_API_URL}
     secret-key: ${CLOVA_OCR_SECRET_KEY}
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY}
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent
+    timeout: 30
 
 jwt:
   secret: ${JWT_SECRET}
