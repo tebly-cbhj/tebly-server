@@ -42,7 +42,13 @@ public class NotificationScheduler {
                         NotificationType.REMINDER,
                         schedule.getTitle(),
                         schedule.getTitle() + " 일정이 " + schedule.getNotificationLeadMinutes() + "분 후에 시작돼요!",
-                        "/schedules/" + schedule.getId()
+                        "/schedules/" + schedule.getId(),
+                        schedule.getCategory().getId(),
+                        schedule.getId(),
+                        schedule.getTitle(),
+                        null,
+                        null,
+                        schedule.getStartTime()
                 );
 
                 schedule.updateLastNotifiedAt(now);

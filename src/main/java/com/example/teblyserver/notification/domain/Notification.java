@@ -35,6 +35,24 @@ public class Notification {
     @Column(length = 255)
     private String redirectPath;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    @Column(name = "schedule_id")
+    private Long scheduleId;
+
+    @Column(name = "schedule_name", length = 100)
+    private String scheduleName;
+
+    @Column(name = "room_id")
+    private Long roomId;
+
+    @Column(name = "room_name", length = 100)
+    private String roomName;
+
+    @Column(name = "target_time")
+    private LocalDateTime targetTime;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -44,12 +62,20 @@ public class Notification {
     }
 
     @Builder
-    public Notification(User user, NotificationType type, String title, String content, String redirectPath) {
+    public Notification(User user, NotificationType type, String title, String content, String redirectPath,
+                        Long categoryId, Long scheduleId, String scheduleName,
+                        Long roomId, String roomName, LocalDateTime targetTime) {
         this.user = user;
         this.type = type;
         this.title = title;
         this.content = content;
         this.redirectPath = redirectPath;
+        this.categoryId = categoryId;
+        this.scheduleId = scheduleId;
+        this.scheduleName = scheduleName;
+        this.roomId = roomId;
+        this.roomName = roomName;
+        this.targetTime = targetTime;
     }
 
     public void markAsRead() {
