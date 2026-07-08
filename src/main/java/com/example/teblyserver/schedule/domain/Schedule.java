@@ -41,6 +41,15 @@ public class Schedule {
     @Column(nullable = false)
     private LocalDateTime endTime;   // ERD의 end_time 반영
 
+    @Column
+    private String location;
+
+    @Column(columnDefinition = "TEXT")
+    private String memo;
+
+    @Column
+    private LocalDateTime repeatUntil; // 반복 종료일
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private RepeatType repeatType = RepeatType.NONE; // ERD의 기본값 'NONE' 반영
@@ -62,8 +71,19 @@ public class Schedule {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    // 정적 팩토리 메서드 업데이트 (OCR 로그 없이 생성할 때)
-    public static Schedule create(User user, Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType, Integer notificationLeadMinutes) {
+    // 정적 팩토리 메서드 업데이트 (전체 필드 포함)
+    public static Schedule create(
+            User user,
+            Category category,
+            String title,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            RepeatType repeatType,
+            Integer notificationLeadMinutes,
+            String location,
+            String memo,
+            LocalDateTime repeatUntil
+    ) {
         Schedule schedule = new Schedule();
         schedule.user = user;
         schedule.category = category;
@@ -72,10 +92,29 @@ public class Schedule {
         schedule.endTime = endTime;
         schedule.repeatType = repeatType;
         schedule.notificationLeadMinutes = notificationLeadMinutes;
+        schedule.location = location;
+        schedule.memo = memo;
+        schedule.repeatUntil = repeatUntil;
         return schedule;
     }
 
-    public void update(Category category, String title, LocalDateTime startTime, LocalDateTime endTime, RepeatType repeatType, Integer notificationLeadMinutes) {
+
+    // 기존 create 메서드 오버로딩 (OCR 및 약속 확정 일정 생성 시 하위 호환성 유지)
+    public static Schedule create(User user,
+                                  Category category,
+                                  String title,
+                                  LocalDateTime startTime,
+                                  LocalDateTime endTime,
+                                  RepeatType repeatType,
+                                  Integer notificationLeadMinutes) {
+        return create(user, category, title, startTime, endTime, repeatType,
+                notificationLeadMinutes, null, null, null);
+    }
+
+
+    public void update(Category category, String title, LocalDateTime startTime,
+                       LocalDateTime endTime, RepeatType repeatType, Integer notificationLeadMinutes,
+                       String location, String memo, LocalDateTime repeatUntil) {
         if (category != null) {
             this.category = category; // 일정 수정 시 카테고리 수정 가능
         }
@@ -92,7 +131,11 @@ public class Schedule {
             this.repeatType = repeatType;
         }
         this.notificationLeadMinutes = notificationLeadMinutes;
+        this.location = location;
+        this.memo = memo;
+        this.repeatUntil = repeatUntil;
     }
+
 
     public void delete() {
         this.isDeleted = true;

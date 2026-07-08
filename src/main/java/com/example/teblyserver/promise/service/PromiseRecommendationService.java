@@ -589,6 +589,12 @@ public class PromiseRecommendationService {
             case MONTHLY ->
                     occurrenceDate.getDayOfMonth() == originalDate.getDayOfMonth();
 
+            case YEARLY ->
+                    occurrenceDate.getMonth() == originalDate.getMonth() &&
+                            occurrenceDate.getDayOfMonth() ==
+                                    originalDate.getDayOfMonth();
+
+
             case NONE -> occurrenceDate.isEqual(originalDate);
         };
     }

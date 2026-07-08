@@ -20,13 +20,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             "JOIN FETCH s.category c " +
             "JOIN FETCH s.user u " +
             "WHERE s.user.id = :userId " +
-            "AND (" +
-            // 조건 1. 단건(NONE) 일정이면서 해당 기간에 포함될 때
-            "(s.repeatType = 'NONE' AND s.startTime <= :endDateTime AND s.endTime >= :startDateTime) " +
-            "OR " +
-            // 조건 2. 반복 일정(WEEKLY 등)이면서, 조회하려는 기간의 '끝' 이전에 시작된 적이 있는 모든 일정
-            "(s.repeatType != 'NONE' AND s.startTime <= :endDateTime)" +
-            ")")
+            "AND ((s.repeatType = 'NONE' AND s.startTime <= :endDateTime AND s.endTime >= :startDateTime) " +
+            "OR (s.repeatType != 'NONE' AND s.startTime <= :endDateTime " +
+            "AND (s.repeatUntil IS NULL OR s.repeatUntil >= :startDateTime)))")
     List<Schedule> findSchedulesWithinRange(
             @Param("userId") Long userId,
             @Param("startDateTime") LocalDateTime startDateTime,
@@ -82,6 +78,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                 (
                     s.repeatType <> com.example.teblyserver.schedule.domain.RepeatType.NONE
                     and s.startTime < :endDateTime
+                    and (s.repeatUntil is null or s.repeatUntil >= :startDateTime)
                 )
           )
         """)
