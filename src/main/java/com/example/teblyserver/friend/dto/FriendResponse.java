@@ -16,4 +16,4 @@ public class FriendResponse {
         this.bio = user.getBio();
         this.profileImageUrl = user.getProfileImageUrl();
     }
-}햐
+}
