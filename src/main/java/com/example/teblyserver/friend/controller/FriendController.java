@@ -1,13 +1,18 @@
 package com.example.teblyserver.friend.controller;
 
 import com.example.teblyserver.common.response.ApiResponse;
+import com.example.teblyserver.friend.dto.FriendCodeRequest;
+import com.example.teblyserver.friend.dto.FriendLinkRequest;
+import com.example.teblyserver.friend.dto.FriendResponse;
 import com.example.teblyserver.friend.service.FriendService;
+import com.example.teblyserver.schedule.dto.response.ScheduleResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/friends")
@@ -18,7 +23,7 @@ public class FriendController {
 
     // 친구 목록 조회
     @GetMapping
-    public ResponseEntity<ApiResponse<?>> getFriends(
+    public ResponseEntity<ApiResponse<List<FriendResponse>>> getFriends(
             @AuthenticationPrincipal Long userId) {
         return ResponseEntity.ok(ApiResponse.success(friendService.getFriends(userId)));
     }
@@ -27,16 +32,17 @@ public class FriendController {
     @PostMapping("/requests/code")
     public ResponseEntity<ApiResponse<Void>> addFriendByCode(
             @AuthenticationPrincipal Long userId,
-            @RequestBody java.util.Map<String, String> request) {
-        friendService.addFriendByCode(userId, request.get("invite_code"));
+            @RequestBody FriendCodeRequest request) {
+        friendService.addFriendByCode(userId, request.inviteCode());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
     // 링크로 친구 추가
     @PostMapping("/requests/link")
     public ResponseEntity<ApiResponse<Void>> addFriendByLink(
             @AuthenticationPrincipal Long userId,
-            @RequestBody java.util.Map<String, String> request) {
-        friendService.addFriendByLink(userId, request.get("invite_token"));
+            @RequestBody FriendLinkRequest request) {
+        friendService.addFriendByLink(userId, request.inviteToken());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -51,7 +57,7 @@ public class FriendController {
 
     // 친구 일정 조회
     @GetMapping("/{friendId}/schedules")
-    public ResponseEntity<ApiResponse<?>> getFriendSchedule(
+    public ResponseEntity<ApiResponse<ScheduleResponseDto>> getFriendSchedule(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long friendId,
             @RequestParam String view,
