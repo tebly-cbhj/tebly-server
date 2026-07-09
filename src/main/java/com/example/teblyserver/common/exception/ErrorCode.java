@@ -24,6 +24,10 @@ public enum ErrorCode {
     OCR_EMPTY_FILE(HttpStatus.BAD_REQUEST, "OCR_400_1", "파일이 비어있습니다."),
     OCR_UNSUPPORTED_FORMAT(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "OCR_415_1", "지원하지 않는 파일 형식입니다. jpg, png, jpeg만 허용됩니다."),
 
+    // file - 4xx
+    INVALID_FILE(HttpStatus.BAD_REQUEST, "FILE_400_1", "업로드된 파일이 비어있습니다."),
+    INVALID_FILE_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "FILE_415_1", "지원하지 않는 파일 형식입니다. jpg, jpeg, png, webp만 허용됩니다."),
+
     // room - 4xx
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "ROOM_404_1", "존재하지 않는 방입니다."),
     ROOM_FORBIDDEN(HttpStatus.FORBIDDEN, "ROOM_403_1", "해당 방에 접근할 권한이 없습니다."),
@@ -63,6 +67,7 @@ public enum ErrorCode {
     // 5xx - Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500_1", "서버 내부 오류가 발생했습니다."),
     DEFAULT_CATEGORY_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "CATEGORY_500_1", "사용자의 기본(기타) 카테고리가 존재하지 않습니다."),
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_500_1", "파일 업로드 중 오류가 발생했습니다."),
     ;
 
     private final HttpStatus httpStatus;

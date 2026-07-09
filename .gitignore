@@ -38,3 +38,5 @@ out/
 
 ### Env ###
 .env
+src/main/resources/application-local.yml
+local-uploads/

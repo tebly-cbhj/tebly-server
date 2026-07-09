@@ -37,6 +37,8 @@ services:
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+    volumes:
+      - /home/ubuntu/tebly-uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy

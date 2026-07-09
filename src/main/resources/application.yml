@@ -60,6 +60,10 @@ gemini:
 jwt:
   secret: ${JWT_SECRET}
 
+file:
+  upload-dir: /app/uploads/profile
+  base-url: https://tebly.org/images/profile
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
