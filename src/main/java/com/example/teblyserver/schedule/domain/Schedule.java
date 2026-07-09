@@ -10,6 +10,8 @@ import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "schedules")
@@ -27,7 +29,7 @@ public class Schedule {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // 🔗 [연관관계] 일정 카테고리 (1 : N)
+    // [연관관계] 일정 카테고리 (1 : N)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -36,10 +38,10 @@ public class Schedule {
     private String title;
 
     @Column(nullable = false)
-    private LocalDateTime startTime; // ERD의 start_time 반영
+    private LocalDateTime startTime;
 
     @Column(nullable = false)
-    private LocalDateTime endTime;   // ERD의 end_time 반영
+    private LocalDateTime endTime;
 
     @Column
     private String location;
@@ -52,16 +54,13 @@ public class Schedule {
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    private RepeatType repeatType = RepeatType.NONE; // ERD의 기본값 'NONE' 반영
+    private RepeatType repeatType = RepeatType.NONE;
 
-    @Column
-    private Integer notificationLeadMinutes; // 5분 : 5, 10분 : 10, 1시간 : 60, 1일전 : 1440 등
+    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ScheduleReminder> reminders = new ArrayList<>();
 
     @Column(nullable = false)
     private boolean isDeleted = false;
-
-    @Column
-    private LocalDateTime lastNotifiedAt; // 마지막으로 알림을 보낸 시각 (반복 일정 중복 알림 방지용)
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -79,7 +78,7 @@ public class Schedule {
             LocalDateTime startTime,
             LocalDateTime endTime,
             RepeatType repeatType,
-            Integer notificationLeadMinutes,
+            List<Integer> notificationLeadMinutesList,
             String location,
             String memo,
             LocalDateTime repeatUntil
@@ -91,10 +90,10 @@ public class Schedule {
         schedule.startTime = startTime;
         schedule.endTime = endTime;
         schedule.repeatType = repeatType;
-        schedule.notificationLeadMinutes = notificationLeadMinutes;
         schedule.location = location;
         schedule.memo = memo;
         schedule.repeatUntil = repeatUntil;
+        schedule.applyReminders(notificationLeadMinutesList);
         return schedule;
     }
 
@@ -106,14 +105,14 @@ public class Schedule {
                                   LocalDateTime startTime,
                                   LocalDateTime endTime,
                                   RepeatType repeatType,
-                                  Integer notificationLeadMinutes) {
+                                  List<Integer> notificationLeadMinutesList) {
         return create(user, category, title, startTime, endTime, repeatType,
-                notificationLeadMinutes, null, null, null);
+                notificationLeadMinutesList, null, null, null);
     }
 
 
     public void update(Category category, String title, LocalDateTime startTime,
-                       LocalDateTime endTime, RepeatType repeatType, Integer notificationLeadMinutes,
+                       LocalDateTime endTime, RepeatType repeatType, List<Integer> notificationLeadMinutesList,
                        String location, String memo, LocalDateTime repeatUntil) {
         if (category != null) {
             this.category = category; // 일정 수정 시 카테고리 수정 가능
@@ -130,10 +129,22 @@ public class Schedule {
         if (repeatType != null) {
             this.repeatType = repeatType;
         }
-        this.notificationLeadMinutes = notificationLeadMinutes;
+        if (notificationLeadMinutesList != null) {
+            applyReminders(notificationLeadMinutesList);
+        }
         this.location = location;
         this.memo = memo;
         this.repeatUntil = repeatUntil;
+    }
+
+    private void applyReminders(List<Integer> leadMinutesList) {
+        this.reminders.clear();
+        if (leadMinutesList == null) {
+            return;
+        }
+        for (Integer leadMinutes : leadMinutesList) {
+            this.reminders.add(ScheduleReminder.create(this, leadMinutes));
+        }
     }
 
 
@@ -141,15 +152,4 @@ public class Schedule {
         this.isDeleted = true;
     }
 
-    public void updateLastNotifiedAt(LocalDateTime notifiedAt) {
-        this.lastNotifiedAt = notifiedAt;
-    }
-
-    // 알림이 울려야 하는 실제 시각 을 직접 계산해 주는 비즈니스 메서드를 제공
-    public LocalDateTime getCalculatedNotificationTime() {
-        if (this.notificationLeadMinutes == null) {
-            return null;
-        }
-        return this.startTime.minusMinutes(this.notificationLeadMinutes);
-    }
 }

@@ -2,11 +2,11 @@ package com.example.teblyserver.schedule.dto.request;
 
 import com.example.teblyserver.schedule.domain.RepeatType;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ScheduleRequestDto(
         @NotNull(message = "카테고리 ID는 필수입니다.")
@@ -26,7 +26,7 @@ public record ScheduleRequestDto(
         @NotNull(message = "반복 타입은 필수입니다.")
         RepeatType repeatType,
 
-        Integer notificationLeadMinutes,
+        List<Integer> notificationLeadMinutes,
 
         String location,
 
