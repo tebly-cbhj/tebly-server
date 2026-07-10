@@ -8,7 +8,8 @@ public record CategoryResponseDto(
          String categoryName,
          String categoryIcon,
         // 프론트엔드가 "비공개인 카테고리"를 표시해주기 위해 추가
-         boolean isPrivate
+         boolean isPrivate,
+         boolean isDefault
 ) {
     // 마스킹 여부(isMasked)를 파라미터로 받아서 알아서 변환해 주는 팩토리 메서드
     public static CategoryResponseDto of(Category category, boolean isMasked) {
@@ -19,6 +20,7 @@ public record CategoryResponseDto(
                     "일정",              // 마스킹 처리
                     // TODO: 기타 아이콘 URL 나오면 수정
                     "default_icon_url", // 마스킹 아이콘
+                    true,
                     true
             );
         }
@@ -28,7 +30,8 @@ public record CategoryResponseDto(
                 category.getId(),
                 category.getName(),
                 category.getIcon(),
-                category.isPrivate()
+                category.isPrivate(),
+                category.isDefault()
         );
     }
 }

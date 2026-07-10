@@ -65,7 +65,10 @@ public class ScheduleService {
                 requestDto.startTime(),
                 requestDto.endTime(),
                 requestDto.repeatType(),
-                requestDto.notificationLeadMinutes()
+                requestDto.notificationLeadMinutes(),
+                requestDto.location(),
+                requestDto.memo(),
+                requestDto.repeatUntil()
         );
 
         // 4. Repository를 통해 DB에 최종 저장
@@ -122,7 +125,9 @@ public class ScheduleService {
             } else {
                 // 반복 일정: 현재 계산하는 일정이 프론트가 요청한 기간을 벗어날 때까지 계속 더해가며 복제
                 while (!currentStart.isAfter(endDateTime)) {
-
+                    if (schedule.getRepeatUntil() != null && currentStart.isAfter(schedule.getRepeatUntil())) {
+                        break;
+                    }
                     if (!currentEnd.isBefore(startDateTime)) {
                         resultDtos.add(EventDto.fromExpanded(schedule, loginUserId, currentStart, currentEnd));
                     }
@@ -140,6 +145,10 @@ public class ScheduleService {
                         case MONTHLY -> {
                             currentStart = currentStart.plusMonths(1);
                             currentEnd = currentEnd.plusMonths(1);
+                        }
+                        case YEARLY -> {
+                            currentStart = currentStart.plusYears(1);
+                            currentEnd = currentEnd.plusYears(1);
                         }
                         default -> {
                             throw new CustomException(ErrorCode.INVALID_INPUT);
@@ -193,7 +202,18 @@ public class ScheduleService {
 
 
         // 4. 엔티티의 값을 변경
-        schedule.update(category, dto.title(), dto.startTime(), dto.endTime(), dto.repeatType(), dto.notificationLeadMinutes());
+        schedule.update(
+                category,
+                dto.title(),
+                dto.startTime(),
+                dto.endTime(),
+                dto.repeatType(),
+                dto.notificationLeadMinutes(),
+                dto.location(),
+                dto.memo(),
+                dto.repeatUntil()
+        );
+
 
         // 별도로 repository.save()를 하지 않아도 됨, @Transactional 덕분에 Dirty-checking
         return schedule.getId();

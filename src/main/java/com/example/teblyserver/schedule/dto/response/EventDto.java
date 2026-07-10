@@ -16,7 +16,10 @@ public record EventDto(
         LocalDateTime startAt,
         LocalDateTime endAt,
         RepeatType repeatType,
-        Integer notificationLeadMinutes
+        Integer notificationLeadMinutes,
+        String location,
+        String memo,
+        LocalDateTime repeatUntil
 ) {
     // 엔티티 객체를 DTO로 편하게 변환하기 위한 정적 팩토리 메서드
     public static EventDto from(Schedule schedule, Long loginUserId) {
@@ -30,6 +33,9 @@ public record EventDto(
 
         // 마스킹 상태라면 제목도 "일정"으로 덮어씌움
         String displayTitle = isMasked ? "일정" : schedule.getTitle();
+        // [추가] 마스킹 상태라면 장소와 메모도 숨김 처리
+        String displayLocation = isMasked ? null : schedule.getLocation();
+        String displayMemo = isMasked ? null : schedule.getMemo();
 
         return new EventDto(
                 schedule.getId(),
@@ -39,7 +45,10 @@ public record EventDto(
                 schedule.getStartTime(),
                 schedule.getEndTime(),
                 schedule.getRepeatType(),
-                schedule.getNotificationLeadMinutes()
+                schedule.getNotificationLeadMinutes(),
+                displayLocation,
+                displayMemo,
+                schedule.getRepeatUntil()
         );
     }
 
@@ -49,6 +58,8 @@ public record EventDto(
 
         boolean isMasked = !schedule.getUser().getId().equals(loginUserId) && categoryEntity.isPrivate();
         String displayTitle = isMasked ? "일정" : schedule.getTitle();
+        String displayLocation = isMasked ? null : schedule.getLocation();
+        String displayMemo = isMasked ? null : schedule.getMemo();
 
         return new EventDto(
                 schedule.getId(),
@@ -57,7 +68,10 @@ public record EventDto(
                 expandedStart, // 새롭게 계산된 반복 시간
                 expandedEnd,   // 새롭게 계산된 반복 종료 시간
                 schedule.getRepeatType(),
-                schedule.getNotificationLeadMinutes()
+                schedule.getNotificationLeadMinutes(),
+                displayLocation,
+                displayMemo,
+                schedule.getRepeatUntil()
         );
     }
 }

@@ -26,5 +26,12 @@ public record ScheduleRequestDto(
         @NotNull(message = "반복 타입은 필수입니다.")
         RepeatType repeatType,
 
-        Integer notificationLeadMinutes
+        Integer notificationLeadMinutes,
+
+        String location,
+
+        String memo,
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        LocalDateTime repeatUntil
 ) {}
