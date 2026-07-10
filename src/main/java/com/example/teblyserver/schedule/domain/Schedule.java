@@ -142,9 +142,9 @@ public class Schedule {
         if (leadMinutesList == null) {
             return;
         }
-        for (Integer leadMinutes : leadMinutesList) {
-            this.reminders.add(ScheduleReminder.create(this, leadMinutes));
-        }
+        leadMinutesList.stream()
+                .distinct()
+                .forEach(leadMinutes -> this.reminders.add(ScheduleReminder.create(this, leadMinutes)));
     }
 
 
