@@ -158,7 +158,13 @@ public class PromiseService {
                         NotificationType.INVITATION,
                         savedPromise.getTitle(),
                         invitationMessageBuilder.apply(savedPromise, member.getUser()),
-                        "/promises/" + savedPromise.getId()
+                        "/promises/" + savedPromise.getId(),
+                        savedPromise.getCategory().getId(),   // categoryId
+                        savedPromise.getId(),                  // scheduleId (약속 ID)
+                        savedPromise.getTitle(),                // scheduleName
+                        room.getId(),                           // roomId
+                        room.getName(),                         // roomName
+                        savedPromise.getStartTime()             // targetTime
                 );
             }
         }
@@ -566,7 +572,13 @@ public class PromiseService {
                 NotificationType.POKE,
                 promise.getTitle(),
                 promise.getSender().getNickname() + "님이 '" + promise.getTitle() + "' 약속에 응답해달라고 콕 찔렀어요!",
-                "/promises/" + promiseId
+                "/promises/" + promiseId,
+                promise.getCategory().getId(),
+                promise.getId(),
+                promise.getTitle(),
+                promise.getRoom().getId(),
+                promise.getRoom().getName(),
+                promise.getStartTime()
         );
 
         return new PromisePokeResponse(

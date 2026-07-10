@@ -69,7 +69,13 @@ public class RoomService {
                         NotificationType.INVITATION,
                         "방 초대",
                         room.getName() + "에 초대되었어요!",
-                        "/rooms/" + room.getId()
+                        "/rooms/" + room.getId(),
+                        null,               // categoryId
+                        null,               // scheduleId
+                        null,               // scheduleName
+                        room.getId(),       // roomId
+                        room.getName(),     // roomName
+                        null                // targetTime
                 );
             }
         }
@@ -233,7 +239,13 @@ public class RoomService {
                         NotificationType.INVITATION,
                         "방 초대",
                         room.getName() + "에 초대되었어요!",
-                        "/rooms/" + roomId
+                        "/rooms/" + roomId,
+                        null,
+                        null,
+                        null,
+                        room.getId(),
+                        room.getName(),
+                        null
                 );
             }
         }
