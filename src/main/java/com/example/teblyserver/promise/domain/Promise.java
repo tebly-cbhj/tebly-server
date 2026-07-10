@@ -67,8 +67,14 @@ public class Promise {
 
     // 알림 시간
     // 예: 5분 전 = 5, 10분 전 = 10, 1시간 전 = 60, 1일 전 = 1440
-    @Column(name = "notification_lead_minutes")
-    private Integer notificationLeadMinutes;
+    // 다중 설정
+    @ElementCollection
+    @CollectionTable(
+            name = "promise_notification_lead_minutes",
+            joinColumns = @JoinColumn(name = "promise_id")
+    )
+    @Column(name = "lead_minutes")
+    private List<Integer> notificationLeadMinutes = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -90,7 +96,7 @@ public class Promise {
             Room room, User sender, Category category, String title, String comment,
             LocalDate proposeStartDate, LocalDate proposeEndDate,
             LocalDateTime startTime, LocalDateTime endTime,
-            String location, Integer notificationLeadMinutes, Integer minDuration
+            String location, List<Integer> notificationLeadMinutes, Integer minDuration
     ) {
         Promise promise = new Promise();
         promise.room = room;
@@ -103,7 +109,8 @@ public class Promise {
         promise.startTime = startTime;
         promise.endTime = endTime;
         promise.location = location;
-        promise.notificationLeadMinutes = notificationLeadMinutes;
+        promise.notificationLeadMinutes = notificationLeadMinutes != null
+                ? new ArrayList<>(notificationLeadMinutes) : new ArrayList<>();
         promise.minDuration = minDuration;
         promise.status = PromiseStatus.PENDING;
         return promise;
@@ -113,7 +120,7 @@ public class Promise {
             Category category, String title, String comment,
             LocalDate proposeStartDate, LocalDate proposeEndDate,
             LocalDateTime startTime, LocalDateTime endTime,
-            String location, Integer notificationLeadMinutes, Integer minDuration
+            String location, List<Integer> notificationLeadMinutes, Integer minDuration
     ) {
         this.category = category;
         this.title = title;
@@ -123,7 +130,8 @@ public class Promise {
         this.startTime = startTime;
         this.endTime = endTime;
         this.location = location;
-        this.notificationLeadMinutes = notificationLeadMinutes;
+        this.notificationLeadMinutes = notificationLeadMinutes != null
+                ? new ArrayList<>(notificationLeadMinutes) : new ArrayList<>();
         this.minDuration = minDuration;
     }
 

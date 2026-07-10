@@ -264,9 +264,7 @@ public class ScheduleService {
                             promise.getStartTime(),
                             promise.getEndTime(),
                             RepeatType.NONE,
-                            promise.getNotificationLeadMinutes() != null
-                                    ? List.of(promise.getNotificationLeadMinutes())
-                                    : List.of()
+                            promise.getNotificationLeadMinutes()
                     );
                 })
                 .toList();
