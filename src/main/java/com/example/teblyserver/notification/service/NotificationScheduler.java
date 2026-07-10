@@ -30,6 +30,7 @@ public class NotificationScheduler {
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
 
         List<ScheduleReminder> candidates = scheduleReminderRepository.findReminderCandidates(now, within24h, todayStart);
+        log.info("스케줄러 실행: now={}, 후보 개수={}", now, candidates.size());
 
         for (ScheduleReminder reminder : candidates) {
             Schedule schedule = reminder.getSchedule();
