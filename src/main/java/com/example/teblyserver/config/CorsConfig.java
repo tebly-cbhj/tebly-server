@@ -14,7 +14,12 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOriginPatterns("*")  // 개발 단계: 전체 허용
+                        .allowedOriginPatterns(
+                                "https://tebly.org",
+                                "https://tebly-client.vercel.app",
+                                "http://localhost:5173",
+                                "http://localhost:3000"
+                        )
                         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
