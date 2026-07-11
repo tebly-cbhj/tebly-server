@@ -2,11 +2,7 @@ server:
   port: 8080
   forward-headers-strategy: native
 
-jackson:
-  deserialization:
-    adjust-dates-to-context-time-zone: false
-  serialization:
-    write-dates-as-timestamps: false
+spring:
   security:
     oauth2:
       client:
@@ -48,7 +44,6 @@ jackson:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
-
 
 clova:
   ocr:
