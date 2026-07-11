@@ -30,7 +30,6 @@ public class ChatMessageService {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     private final RoomMemberRepository roomMemberRepository;
-    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public ChatMessageResponse saveMessage(ChatMessageRequest request, Long senderId) {
