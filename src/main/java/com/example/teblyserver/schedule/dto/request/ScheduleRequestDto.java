@@ -16,11 +16,11 @@ public record ScheduleRequestDto(
         String title,
 
         @NotNull(message = "시작 시간은 필수입니다.")
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS][.SS][.S][X]")
         LocalDateTime startTime,
 
         @NotNull(message = "종료 시간은 필수입니다.")
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS][.SS][.S][X]")
         LocalDateTime endTime,
 
         @NotNull(message = "반복 타입은 필수입니다.")
@@ -32,6 +32,6 @@ public record ScheduleRequestDto(
 
         String memo,
 
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS][.SS][.S][X]")
         LocalDateTime repeatUntil
 ) {}
