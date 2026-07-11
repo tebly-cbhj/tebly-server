@@ -7,6 +7,8 @@ import com.example.teblyserver.notification.domain.Notification;
 import com.example.teblyserver.notification.domain.NotificationType;
 import com.example.teblyserver.notification.dto.NotificationResponse;
 import com.example.teblyserver.notification.repository.NotificationRepository;
+import com.example.teblyserver.room.domain.InviteStatus;
+import com.example.teblyserver.room.repository.RoomMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final RoomMemberRepository roomMemberRepository;
 
     // 기존 호출부 호환용 (필드 없이 알림 보낼 때)
     @Transactional
@@ -67,6 +70,17 @@ public class NotificationService {
     public List<NotificationResponse> getInvitationNotifications(Long userId) {
         return notificationRepository.findByUserIdAndTypeOrderByCreatedAtDesc(userId, NotificationType.INVITATION)
                 .stream()
+                .filter(n -> {
+                    // 알림에 연결된 roomId가 없는 경우 제외
+                    if (n.getRoomId() == null) return false;
+                    // 해당 방에 로그인 유저가 여전히 PENDING 상태인 경우에만 노출
+                    return
+                            roomMemberRepository.existsByRoomIdAndUserIdAndInviteStatus(
+                                    n.getRoomId(),
+                                    userId,
+                                    InviteStatus.PENDING
+                            );
+                })
                 .map(NotificationResponse::from)
                 .toList();
     }
