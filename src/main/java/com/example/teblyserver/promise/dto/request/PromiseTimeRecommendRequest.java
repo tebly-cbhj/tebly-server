@@ -34,10 +34,10 @@ public record PromiseTimeRecommendRequest(
 
         public PromiseTimeRecommendRequest {
                 if (searchStartTime == null) {
-                        searchStartTime = LocalTime.of(8, 0); // 기본값: 오전 8시
+                        searchStartTime = LocalTime.of(9, 0); // 기본값: 오전 9시
                 }
                 if (searchEndTime == null) {
-                        searchEndTime = LocalTime.of(23, 59); // 기본값: 오후 23시 59분
+                        searchEndTime = LocalTime.of(23, 30); // 기본값: 오후 23시 30분
                 }
         }
 }
