@@ -61,8 +61,8 @@ jwt:
   secret: ${JWT_SECRET}
 
 file:
-  upload-dir: /app/uploads/profile
-  base-url: https://tebly.org/images/profile
+  upload-dir: /app/uploads
+  base-url: https://tebly.org/images
 
 springdoc:
   swagger-ui:

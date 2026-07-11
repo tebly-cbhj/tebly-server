@@ -44,7 +44,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        String imageUrl = fileStorageService.storeProfileImage(file);
+        String imageUrl = fileStorageService.storeFile(file,"profile");
         user.updateProfile(null, null, imageUrl);
 
         return imageUrl;
