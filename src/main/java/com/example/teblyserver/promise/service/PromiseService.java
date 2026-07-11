@@ -551,6 +551,13 @@ public class PromiseService {
                 .findFirst()
                 .orElseThrow(() -> new CustomException(ErrorCode.PROMISE_MEMBER_NOT_FOUND));
 
+        // 콕찌르기를 보낸 실제 유저 (약속 생성자가 아닐 수도 있음)
+        User poker = promise.getMembers().stream()
+                .filter(member -> member.getUser().getId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ErrorCode.PROMISE_FORBIDDEN))
+                .getUser();
+
         // 미응답 멤버에게만 콕찌르기 가능
         if (targetMember.getStatus() != PromiseMemberStatus.PENDING) {
             throw new CustomException(ErrorCode.PROMISE_MEMBER_NOT_PENDING);
@@ -566,19 +573,22 @@ public class PromiseService {
         // 마지막 콕찌르기 시간 갱신
         targetMember.updateLastPokedAt(now);
 
-        // 실제 알림 발송은 알림 서비스에서 처리
+        // 실제 알림 발송은 알림 서비스에서 처리 (누가 찔렀는지 구조화된 필드로도 함께 남김)
         notificationService.send(
                 targetMember.getUser(),
                 NotificationType.POKE,
                 promise.getTitle(),
-                promise.getSender().getNickname() + "님이 '" + promise.getTitle() + "' 약속에 응답해달라고 콕 찔렀어요!",
+                poker.getNickname() + "님이 '" + promise.getTitle() + "' 약속에 응답해달라고 콕 찔렀어요!",
                 "/promises/" + promiseId,
                 promise.getCategory().getId(),
                 promise.getId(),
                 promise.getTitle(),
                 promise.getRoom().getId(),
                 promise.getRoom().getName(),
-                promise.getStartTime()
+                promise.getStartTime(),
+                poker.getId(),
+                poker.getNickname(),
+                poker.getProfileImageUrl()
         );
 
         return new PromisePokeResponse(
