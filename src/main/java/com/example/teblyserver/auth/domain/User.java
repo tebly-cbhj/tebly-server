@@ -29,8 +29,10 @@ public class User {
 
     private String nickname;
 
+    @Column(length = 512)
     private String profileImageUrl;
 
+    @Column(length = 500)
     private String bio;
 
     private String invitationCode;
