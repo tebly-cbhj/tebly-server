@@ -2,7 +2,6 @@ package com.example.teblyserver.schedule.dto.request;
 
 import com.example.teblyserver.schedule.domain.RepeatType;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 

@@ -1,9 +1,0 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/mydb
-    username: myuser
-    password: mypassword
-
-file:
-  upload-dir: ./uploads                   # 프로젝트 루트 폴더 아래의 uploads 폴더에 저장
-  base-url: http://localhost:8080/images  # 로컬 서버 주소로 이미지 요청 URL 반환
