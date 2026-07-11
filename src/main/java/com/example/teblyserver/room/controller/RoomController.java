@@ -1,17 +1,21 @@
 package com.example.teblyserver.room.controller;
 
+import com.example.teblyserver.common.file.FileStorageService;
 import com.example.teblyserver.common.response.ApiResponse;
 import com.example.teblyserver.room.dto.request.*;
 import com.example.teblyserver.room.dto.response.RoomDetailResponse;
+import com.example.teblyserver.room.dto.response.RoomImageUploadResponse;
 import com.example.teblyserver.room.dto.response.RoomListResponse;
 import com.example.teblyserver.room.dto.response.RoomMemberResponse;
 import com.example.teblyserver.room.service.RoomService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -21,6 +25,7 @@ import java.util.List;
 public class RoomController {
 
     private final RoomService roomService;
+    private final FileStorageService fileStorageService;
 
     /**
      * 방 생성 및 멤버 초대 API
@@ -170,4 +175,13 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.success("초대 응답이 처리되었습니다.", null));
     }
 
+    @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<RoomImageUploadResponse>> uploadRoomImage(
+            @RequestParam("file") MultipartFile file) {
+
+        // FileStorageService를 활용해 "room" 하위 폴더에 파일 저장 후 URL 획득
+        String imageUrl = fileStorageService.storeFile(file, "room");
+
+        return ResponseEntity.ok(ApiResponse.success(new RoomImageUploadResponse(imageUrl)));
+    }
 }
