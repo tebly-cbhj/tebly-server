@@ -55,7 +55,7 @@ public record PromiseUpdateTimeFromRecommendationRequest(
                         searchStartTime = LocalTime.of(9, 0); // 기본값: 오전 9시
                 }
                 if (searchEndTime == null) {
-                        searchEndTime = LocalTime.of(22, 0); // 기본값: 오후 10시
+                        searchEndTime = LocalTime.of(23, 30); // 기본값: 오후 11시 30분
                 }
         }
 }
