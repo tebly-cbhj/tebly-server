@@ -3,9 +3,10 @@ package com.example.teblyserver.schedule.dto.response;
 import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.RepeatType;
 import com.example.teblyserver.schedule.domain.Schedule;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.example.teblyserver.schedule.domain.ScheduleReminder;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record EventDto(
         Long eventId,
@@ -16,7 +17,7 @@ public record EventDto(
         LocalDateTime startAt,
         LocalDateTime endAt,
         RepeatType repeatType,
-        Integer notificationLeadMinutes,
+        List<Integer> notificationLeadMinutes,
         String location,
         String memo,
         LocalDateTime repeatUntil
@@ -45,7 +46,7 @@ public record EventDto(
                 schedule.getStartTime(),
                 schedule.getEndTime(),
                 schedule.getRepeatType(),
-                schedule.getNotificationLeadMinutes(),
+                extractLeadMinutes(schedule),
                 displayLocation,
                 displayMemo,
                 schedule.getRepeatUntil()
@@ -68,10 +69,17 @@ public record EventDto(
                 expandedStart, // 새롭게 계산된 반복 시간
                 expandedEnd,   // 새롭게 계산된 반복 종료 시간
                 schedule.getRepeatType(),
-                schedule.getNotificationLeadMinutes(),
+                extractLeadMinutes(schedule),
                 displayLocation,
                 displayMemo,
                 schedule.getRepeatUntil()
         );
+    }
+
+    // Schedule의 reminders 리스트에서 leadMinutes 값들만 뽑아내는 헬퍼
+    private static List<Integer> extractLeadMinutes(Schedule schedule) {
+        return schedule.getReminders().stream()
+                .map(ScheduleReminder::getLeadMinutes)
+                .toList();
     }
 }

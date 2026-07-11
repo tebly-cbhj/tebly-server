@@ -2,9 +2,9 @@ package com.example.teblyserver.schedule.dto.request;
 
 import com.example.teblyserver.schedule.domain.RepeatType;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ScheduleUpdateRequestDto(
         Long categoryId,
@@ -15,7 +15,7 @@ public record ScheduleUpdateRequestDto(
         LocalDateTime endTime,
         RepeatType repeatType,
 
-        Integer notificationLeadMinutes,
+        List<Integer> notificationLeadMinutes,
         String location,
         String memo,
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")

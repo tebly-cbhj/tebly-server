@@ -32,8 +32,7 @@ public record PromiseCreateRequest(
         @Size(max = 50, message = "장소는 50자를 넘을 수 없습니다.")
         String location,
 
-        @Min(value = 0, message = "알림 시간은 0분 이상이어야 합니다.")
-        Integer notificationLeadMinutes,
+        List<@Min(value = 0, message = "알림 시간은 0분 이상이어야 합니다.") Integer> notificationLeadMinutes,
 
         @NotNull(message = "최소 시간 설정은 필수입니다.")
         Integer minDuration,
