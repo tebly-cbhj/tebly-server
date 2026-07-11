@@ -2,12 +2,11 @@ server:
   port: 8080
   forward-headers-strategy: native
 
-spring:
-  jackson:
-    deserialization:
-      adjust-dates-to-context-time-zone: false
-    serialization:
-      write-dates-as-timestamps: false
+jackson:
+  deserialization:
+    adjust-dates-to-context-time-zone: false
+  serialization:
+    write-dates-as-timestamps: false
   security:
     oauth2:
       client:
