@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
@@ -56,4 +57,42 @@ public class FileStorageService {
 
         return baseUrl + "/" + storedFilename;
     }
+
+    public String storeFile(MultipartFile file, String domainPath) {
+        if (file == null || file.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_FILE);
+        }
+
+        // 1. 확장자 추출 및 검증 (기존 로직 유지)
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+
+        String lowerExt = extension.toLowerCase();
+        if (!lowerExt.equals(".jpg") && !lowerExt.equals(".jpeg")
+                && !lowerExt.equals(".png") && !lowerExt.equals(".webp")) {
+            throw new CustomException(ErrorCode.INVALID_FILE_TYPE);
+        }
+        // 2. 도메인별 폴더 지정 (예: profile, room, category)
+        String storedFilename = UUID.randomUUID() + extension;
+        try {
+            // uploadDir 하위에 domainPath(예: "room" 등)를 결합
+            Path uploadPath = Paths.get(uploadDir).resolve(domainPath);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+            Path targetPath = uploadPath.resolve(storedFilename);
+
+            // StandardCopyOption.REPLACE_EXISTING를 추가하여 안전하게 덮어쓰기 허용
+            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
+        }
+        // 3. 도메인별 최종 URL 리턴
+        return baseUrl + "/" + domainPath + "/" + storedFilename;
+    }
+
 }

@@ -45,8 +45,7 @@ public record DecisionHelperPromiseRequest(
         @Size(max = 50, message = "장소는 50자를 넘을 수 없습니다.")
         String location,
 
-        @Min(value = 0, message = "알림 시간은 0분 이상이어야 합니다.")
-        Integer notificationLeadMinutes,
+        List<@Min(value = 0, message = "알림 시간은 0분 이상이어야 합니다.") Integer> notificationLeadMinutes,
 
         @NotEmpty(message = "추천 대상 멤버는 최소 1명 이상이어야 합니다.")
         List<Long> selectedMemberIds

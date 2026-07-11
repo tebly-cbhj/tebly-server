@@ -28,7 +28,7 @@ public record PromiseDetailResponse(
         LocalDateTime endTime,
 
         String location,
-        Integer notificationLeadMinutes,
+        List<Integer> notificationLeadMinutes,
 
         PromiseStatus status,
         Integer minDuration,

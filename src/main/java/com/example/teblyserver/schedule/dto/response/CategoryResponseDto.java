@@ -18,8 +18,7 @@ public record CategoryResponseDto(
             return new CategoryResponseDto(
                     category.getId(),
                     "일정",              // 마스킹 처리
-                    // TODO: 기타 아이콘 URL 나오면 수정
-                    "default_icon_url", // 마스킹 아이콘
+                    "Other", // 마스킹 아이콘
                     true,
                     true
             );
