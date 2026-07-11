@@ -40,6 +40,13 @@ public class FriendService {
         return result;
     }
 
+    // 초대 코드로 상대방 미리보기 (친구 추가 전, 누구인지 확인용)
+    public FriendResponse previewByCode(String inviteCode) {
+        User user = userRepository.findByInvitationCode(inviteCode)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return new FriendResponse(user);
+    }
+
     // 초대 코드로 친구 추가
     @Transactional
     public void addFriendByCode(Long userId, String inviteCode) {

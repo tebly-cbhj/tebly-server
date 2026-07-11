@@ -19,6 +19,9 @@ public record NotificationResponse(
         Long roomId,
         String roomName,
         Long timeLeftMinutes, // 남은 시간(분). 대상 시각 없거나 이미 지났으면 0
+        Long senderId, // 알림을 유발한 행위자(예: 콕찌르기를 보낸 사람). 없으면 null
+        String senderNickname,
+        String senderProfileImageUrl,
         LocalDateTime createdAt
 ) {
     public static NotificationResponse from(Notification n) {
@@ -41,6 +44,9 @@ public record NotificationResponse(
                 n.getRoomId(),
                 n.getRoomName(),
                 timeLeft,
+                n.getSenderId(),
+                n.getSenderNickname(),
+                n.getSenderProfileImageUrl(),
                 n.getCreatedAt()
         );
     }

@@ -28,6 +28,13 @@ public class FriendController {
         return ResponseEntity.ok(ApiResponse.success(friendService.getFriends(userId)));
     }
 
+    // 초대 코드로 상대방 미리보기 (추가 전 확인용)
+    @GetMapping("/preview")
+    public ResponseEntity<ApiResponse<FriendResponse>> previewByCode(
+            @RequestParam String code) {
+        return ResponseEntity.ok(ApiResponse.success(friendService.previewByCode(code)));
+    }
+
     // 초대 코드로 친구 추가
     @PostMapping("/requests/code")
     public ResponseEntity<ApiResponse<Void>> addFriendByCode(

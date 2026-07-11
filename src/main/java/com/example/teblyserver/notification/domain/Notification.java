@@ -53,6 +53,16 @@ public class Notification {
     @Column(name = "target_time")
     private LocalDateTime targetTime;
 
+    // 알림을 유발한 행위자 정보 (예: 콕찌르기를 보낸 사람). 없으면 null.
+    @Column(name = "sender_id")
+    private Long senderId;
+
+    @Column(name = "sender_nickname", length = 50)
+    private String senderNickname;
+
+    @Column(name = "sender_profile_image_url", length = 255)
+    private String senderProfileImageUrl;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -64,7 +74,8 @@ public class Notification {
     @Builder
     public Notification(User user, NotificationType type, String title, String content, String redirectPath,
                         Long categoryId, Long scheduleId, String scheduleName,
-                        Long roomId, String roomName, LocalDateTime targetTime) {
+                        Long roomId, String roomName, LocalDateTime targetTime,
+                        Long senderId, String senderNickname, String senderProfileImageUrl) {
         this.user = user;
         this.type = type;
         this.title = title;
@@ -76,6 +87,9 @@ public class Notification {
         this.roomId = roomId;
         this.roomName = roomName;
         this.targetTime = targetTime;
+        this.senderId = senderId;
+        this.senderNickname = senderNickname;
+        this.senderProfileImageUrl = senderProfileImageUrl;
     }
 
     public void markAsRead() {

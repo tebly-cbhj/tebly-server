@@ -24,14 +24,24 @@ public class NotificationService {
     // 기존 호출부 호환용 (필드 없이 알림 보낼 때)
     @Transactional
     public void send(User receiver, NotificationType type, String title, String content, String redirectPath) {
-        send(receiver, type, title, content, redirectPath, null, null, null, null, null, null);
+        send(receiver, type, title, content, redirectPath, null, null, null, null, null, null, null, null, null);
     }
 
-    // 알림 생성
+    // 기존 호출부 호환용 (행위자 정보 없이 알림 보낼 때)
     @Transactional
     public void send(User receiver, NotificationType type, String title, String content, String redirectPath,
                      Long categoryId, Long scheduleId, String scheduleName,
                      Long roomId, String roomName, LocalDateTime targetTime) {
+        send(receiver, type, title, content, redirectPath, categoryId, scheduleId, scheduleName,
+                roomId, roomName, targetTime, null, null, null);
+    }
+
+    // 알림 생성 (콕찌르기처럼 "누가" 보냈는지 구조화된 필드로 남겨야 할 때 sender 정보를 함께 저장)
+    @Transactional
+    public void send(User receiver, NotificationType type, String title, String content, String redirectPath,
+                     Long categoryId, Long scheduleId, String scheduleName,
+                     Long roomId, String roomName, LocalDateTime targetTime,
+                     Long senderId, String senderNickname, String senderProfileImageUrl) {
 
         Notification notification = Notification.builder()
                 .user(receiver)
@@ -45,6 +55,9 @@ public class NotificationService {
                 .roomId(roomId)
                 .roomName(roomName)
                 .targetTime(targetTime)
+                .senderId(senderId)
+                .senderNickname(senderNickname)
+                .senderProfileImageUrl(senderProfileImageUrl)
                 .build();
 
         notificationRepository.save(notification);
