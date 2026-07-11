@@ -29,7 +29,7 @@ public class User {
 
     private String nickname;
 
-    @Column(length = 512)
+    @Column(columnDefinition = "TEXT")
     private String profileImageUrl;
 
     @Column(length = 500)
