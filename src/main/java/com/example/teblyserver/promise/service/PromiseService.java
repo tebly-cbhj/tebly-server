@@ -164,7 +164,10 @@ public class PromiseService {
                         savedPromise.getTitle(),                // scheduleName
                         room.getId(),                           // roomId
                         room.getName(),                         // roomName
-                        savedPromise.getStartTime()             // targetTime
+                        savedPromise.getStartTime(),             // targetTime
+                        sender.getId(),
+                        sender.getNickname(),
+                        sender.getProfileImageUrl()
                 );
             }
         }

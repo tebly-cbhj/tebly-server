@@ -70,12 +70,15 @@ public class RoomService {
                         "방 초대",
                         room.getName() + "에 초대되었어요!",
                         "/rooms/" + room.getId(),
-                        null,               // categoryId
-                        null,               // scheduleId
-                        null,               // scheduleName
-                        room.getId(),       // roomId
-                        room.getName(),     // roomName
-                        null                // targetTime
+                        null,
+                        null,
+                        null,
+                        room.getId(),
+                        room.getName(),
+                        null,
+                        host.getId(),           // senderId 추가
+                        host.getNickname(),     // senderNickname 추가
+                        host.getProfileImageUrl() // senderProfileImageUrl 추가
                 );
             }
         }
@@ -215,6 +218,10 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
 
+        // 초대자 조회 추가
+        User inviter = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
         boolean isHost = roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
                 .stream()
                 .anyMatch(rm -> rm.getRole() == RoomRole.HOST);
@@ -233,7 +240,6 @@ public class RoomService {
 
             if (!alreadyActive) {
                 RoomMember.create(room, invitee, RoomRole.MEMBER, InviteStatus.PENDING);
-                // 추가로 초대된 멤버에게 알림 발송
                 notificationService.send(
                         invitee,
                         NotificationType.INVITATION,
@@ -245,7 +251,10 @@ public class RoomService {
                         null,
                         room.getId(),
                         room.getName(),
-                        null
+                        null,
+                        inviter.getId(),              // senderId 추가
+                        inviter.getNickname(),         // senderNickname 추가
+                        inviter.getProfileImageUrl()   // senderProfileImageUrl 추가
                 );
             }
         }
