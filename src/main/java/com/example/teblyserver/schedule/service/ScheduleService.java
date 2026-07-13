@@ -100,10 +100,14 @@ public class ScheduleService {
             // 월간: 해당 월의 1일 00:00:00 ~ 마지막 날 23:59:59
             startDateTime = baseDate.withDayOfMonth(1).atStartOfDay();
             endDateTime = baseDate.with(TemporalAdjusters.lastDayOfMonth()).atTime(LocalTime.MAX);
-        } else if ("weekly".equalsIgnoreCase(view)) {
-            // 주간 (기본값): 월요일 00:00:00 ~ 일요일 23:59:59 (ISO 표준 기준)
-            startDateTime = baseDate.with(DayOfWeek.MONDAY).atStartOfDay();
-            endDateTime = baseDate.with(DayOfWeek.SUNDAY).atTime(LocalTime.MAX);
+        } else if ("weekly".equalsIgnoreCase(view)) { // 주간: 일요일 00:00:00 ~ 토요일 23:59:59
+            LocalDate weekStart =
+                    baseDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+
+            LocalDate weekEnd = weekStart.plusDays(6);
+
+            startDateTime = weekStart.atStartOfDay();
+            endDateTime = weekEnd.atTime(LocalTime.MAX);
         } else {
             // weekly도 아니고 monthly도 아니면 400 에러
             throw new CustomException(ErrorCode.INVALID_INPUT);
