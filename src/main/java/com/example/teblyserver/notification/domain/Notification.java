@@ -60,7 +60,7 @@ public class Notification {
     @Column(name = "sender_nickname", length = 50)
     private String senderNickname;
 
-    @Column(name = "sender_profile_image_url", length = 255)
+    @Column(name = "sender_profile_image_url", columnDefinition = "TEXT")
     private String senderProfileImageUrl;
 
     @Column(nullable = false, updatable = false)
