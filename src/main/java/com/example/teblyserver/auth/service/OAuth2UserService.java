@@ -50,7 +50,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
             email = (String) attributes.get("email");
         }
 
-        User user = userRepository.findByOauthId(oauthId)
+        User user = userRepository.findByOauthIdAndIsDeletedFalse(oauthId)
                 .orElseGet(() -> {
                     User newUser = userRepository.save(
                             User.create(email, provider, oauthId, nickname, profileImageUrl)

@@ -43,7 +43,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                     ? (String) attributes.get("sub")
                     : String.valueOf(attributes.get("id"));
 
-            User user = userRepository.findByOauthId(oauthId)
+            User user = userRepository.findByOauthIdAndIsDeletedFalse(oauthId)
                     .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
             String accessToken = jwtService.generateAccessToken(user.getId());
