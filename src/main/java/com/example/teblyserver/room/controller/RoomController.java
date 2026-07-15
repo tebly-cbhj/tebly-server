@@ -117,19 +117,6 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.success("멤버 목록 조회 성공", response));
     }
 
-    /**
-     * 방 초대 대기(PENDING) 목록 조회 API
-     * URL: GET /rooms/{roomId}/invitations
-     */
-    @GetMapping("/{roomId}/invitations")
-    public ResponseEntity<ApiResponse<List<RoomMemberResponse>>> getPendingInvitations(
-            @AuthenticationPrincipal Long userId,
-            @PathVariable Long roomId
-    ) {
-        List<RoomMemberResponse> response = roomService.getPendingInvitations(userId, roomId);
-
-        return ResponseEntity.ok(ApiResponse.success("초대 대기 목록 조회 성공", response));
-    }
 
     /**
      * 멤버 초대 API (PENDING 레코드 생성)

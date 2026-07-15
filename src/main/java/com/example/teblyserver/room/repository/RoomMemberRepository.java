@@ -20,6 +20,6 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, Long> {
     // 특정 방에서 특정 유저의 삭제되지 않은 RoomMember 목록 조회 (상태 무관, 중복 레코드 가능성 대비 List)
     List<RoomMember> findByRoomIdAndUserIdAndIsDeletedFalse(Long roomId, Long userId);
 
-    // 특정 방의 특정 inviteStatus를 가진 삭제되지 않은 멤버 목록 조회
-    List<RoomMember> findByRoomIdAndInviteStatusAndIsDeletedFalse(Long roomId, InviteStatus inviteStatus);
+    // 방의 삭제되지 않은 전체 멤버 조회 (ACCEPTED + PENDING 모두 포함, status로 구분해서 내려줌)
+    List<RoomMember> findByRoomIdAndIsDeletedFalse(Long roomId);
 }
