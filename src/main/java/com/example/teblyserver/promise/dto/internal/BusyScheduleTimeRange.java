@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
  * (categoryName은 약속 초대 시 충돌 일정의 중요도를 판단할 때 사용)
  */
 public record BusyScheduleTimeRange(
+        Long scheduleId,
         Long userId,
         String title,
         String categoryName,

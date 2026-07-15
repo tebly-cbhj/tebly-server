@@ -14,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/schedules")
@@ -70,7 +71,7 @@ public class ScheduleController {
     }
 
     /**
-     *  일정 삭제 API (Soft Delete)
+     *  일정 삭제 API (Soft Delete) + 전체 반복일정 삭제용도
      * URL: DELETE /schedules/events/{scheduleId}
      */
     @DeleteMapping("/events/{scheduleId}")
@@ -81,5 +82,32 @@ public class ScheduleController {
 
         scheduleService.deleteSchedule(userId, scheduleId);
         return ResponseEntity.ok(ApiResponse.success("일정이 성공적으로 삭제되었습니다.", null));
+    }
+
+
+    /**
+     *
+     *
+     */
+    @DeleteMapping("/events/{scheduleId}/occurrences")
+    public ResponseEntity<ApiResponse<Void>> deleteScheduleOccurrence(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long scheduleId,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime occurrenceStart
+    ) {
+        scheduleService.deleteScheduleOccurrence(
+                userId,
+                scheduleId,
+                occurrenceStart
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "선택한 반복 일정만 삭제되었습니다.",
+                        null
+                )
+        );
     }
 }

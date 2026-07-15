@@ -17,6 +17,7 @@ import com.example.teblyserver.room.domain.Room;
 import com.example.teblyserver.room.domain.RoomMember;
 import com.example.teblyserver.room.repository.RoomRepository;
 import com.example.teblyserver.schedule.domain.RepeatType;
+import com.example.teblyserver.schedule.repository.ScheduleOccurrenceExceptionRepository;
 import com.example.teblyserver.schedule.repository.ScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ public class PromiseRecommendationService {
     private final RoomRepository roomRepository;
     private final ScheduleRepository scheduleRepository;
     private final PromiseRepository promiseRepository;
+    private final ScheduleOccurrenceExceptionRepository scheduleOccurrenceExceptionRepository;
 
     public List<PromiseTimeRecommendationResponse> recommendPromiseTimes(
             Long userId,
@@ -109,6 +111,9 @@ public class PromiseRecommendationService {
                         searchPeriodEnd
                 );
 
+        Map<Long, Set<LocalDateTime>> excludedStarts =
+                loadBusyScheduleExceptions(busySchedules);
+
         // 1. 전원 가능 후보 먼저 수집
         List<PromiseTimeRecommendationResponse> allAvailableCandidates =
                 collectAllAvailableCandidates(
@@ -117,7 +122,8 @@ public class PromiseRecommendationService {
                         busySchedules,
                         totalMemberCount,
                         now,
-                        memberResponses
+                        memberResponses,
+                        excludedStarts
                 );
 
         // 2. 최종 정렬에 사용할 후보군
@@ -142,7 +148,8 @@ public class PromiseRecommendationService {
                             busySchedules,
                             totalMemberCount,
                             now,
-                            memberResponses
+                            memberResponses,
+                            excludedStarts
                     );
 
             for (PromiseTimeRecommendationResponse candidate : leastConflictCandidates) {
@@ -169,7 +176,8 @@ public class PromiseRecommendationService {
                 .filter(candidate -> isHostAvailable(candidate, userId))
                 .sorted(getFinalRecommendationComparator(request.sortType(),
                         now,
-                        busySchedules))
+                        busySchedules,
+                        excludedStarts))
                 .limit(RESPONSE_RECOMMENDATION_COUNT)
                 .toList();
     }
@@ -194,7 +202,37 @@ public class PromiseRecommendationService {
         List<BusyScheduleTimeRange> rawSchedules =
                 scheduleRepository.findBusySchedulesByUserIdsAndPeriod(userIds, windowStart, windowEnd);
 
-        return expandBusySchedulesForDate(rawSchedules, anchorDate, windowStart, windowEnd);
+        Map<Long, Set<LocalDateTime>> excludedStarts =
+                loadBusyScheduleExceptions(rawSchedules);
+
+        return expandBusySchedulesForDate(rawSchedules, anchorDate, windowStart, windowEnd, excludedStarts);
+    }
+
+    private Map<Long, Set<LocalDateTime>> loadBusyScheduleExceptions(
+            List<BusyScheduleTimeRange> schedules
+    ) {
+        List<Long> scheduleIds = schedules.stream()
+                .map(BusyScheduleTimeRange::scheduleId)
+                .distinct()
+                .toList();
+
+        if (scheduleIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Set<LocalDateTime>> result = new HashMap<>();
+
+        scheduleOccurrenceExceptionRepository
+                .findAllBySchedule_IdIn(scheduleIds)
+                .forEach(exception -> result
+                        .computeIfAbsent(
+                                exception.getSchedule().getId(),
+                                ignored -> new HashSet<>()
+                        )
+                        .add(exception.getOccurrenceStartTime())
+                );
+
+        return result;
     }
 
     private List<RoomMember> resolveSelectedAcceptedMembers(
@@ -246,7 +284,8 @@ public class PromiseRecommendationService {
             List<BusyScheduleTimeRange> busySchedules,
             int totalMemberCount,
             LocalDateTime now,
-            List<PromiseRecommendationMemberResponse> memberResponses
+            List<PromiseRecommendationMemberResponse> memberResponses,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         List<PromiseTimeRecommendationResponse> candidates = new ArrayList<>();
 
@@ -261,7 +300,8 @@ public class PromiseRecommendationService {
                             busySchedules,
                             totalMemberCount,
                             now,
-                            memberResponses
+                            memberResponses,
+                            excludedStarts
                     )
             );
 
@@ -278,7 +318,8 @@ public class PromiseRecommendationService {
             List<BusyScheduleTimeRange> busySchedules,
             int totalMemberCount,
             LocalDateTime now,
-            List<PromiseRecommendationMemberResponse> memberResponses
+            List<PromiseRecommendationMemberResponse> memberResponses,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         List<PromiseTimeRecommendationResponse> candidates = new ArrayList<>();
 
@@ -293,7 +334,8 @@ public class PromiseRecommendationService {
                             busySchedules,
                             totalMemberCount,
                             now,
-                            memberResponses
+                            memberResponses,
+                            excludedStarts
                     )
             );
 
@@ -312,7 +354,8 @@ public class PromiseRecommendationService {
             List<BusyScheduleTimeRange> busySchedules,
             int totalMemberCount,
             LocalDateTime now,
-            List<PromiseRecommendationMemberResponse> memberResponses
+            List<PromiseRecommendationMemberResponse> memberResponses,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         // 과거 날짜면 추천하지 않음
         if (date.isBefore(now.toLocalDate())) {
@@ -352,7 +395,8 @@ public class PromiseRecommendationService {
                         busySchedules,
                         date,
                         daySearchStart,
-                        daySearchEnd
+                        daySearchEnd,
+                        excludedStarts
                 );
 
         // 멤버들의 실제 일정을 보고,
@@ -395,7 +439,8 @@ public class PromiseRecommendationService {
             List<BusyScheduleTimeRange> busySchedules,
             int totalMemberCount,
             LocalDateTime now,
-            List<PromiseRecommendationMemberResponse> memberResponses
+            List<PromiseRecommendationMemberResponse> memberResponses,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         if (date.isBefore(now.toLocalDate())) {
             return List.of();
@@ -434,7 +479,8 @@ public class PromiseRecommendationService {
                         busySchedules,
                         date,
                         daySearchStart,
-                        daySearchEnd
+                        daySearchEnd,
+                        excludedStarts
                 );
 
         markBusyBlocks(
@@ -498,7 +544,8 @@ public class PromiseRecommendationService {
             List<BusyScheduleTimeRange> originalSchedules,
             LocalDate date,
             LocalDateTime daySearchStart,
-            LocalDateTime daySearchEnd
+            LocalDateTime daySearchEnd,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         List<BusyScheduleTimeRange> expandedSchedules = new ArrayList<>();
 
@@ -516,7 +563,8 @@ public class PromiseRecommendationService {
                     schedule,
                     date,
                     daySearchStart,
-                    daySearchEnd
+                    daySearchEnd,
+                    excludedStarts
             );
 
             // 자정을 넘는 일정까지 고려하고 싶을 때 필요
@@ -526,7 +574,8 @@ public class PromiseRecommendationService {
                     schedule,
                     date.minusDays(1),
                     daySearchStart,
-                    daySearchEnd
+                    daySearchEnd,
+                    excludedStarts
             );
         }
 
@@ -539,7 +588,8 @@ public class PromiseRecommendationService {
             BusyScheduleTimeRange schedule,
             LocalDate occurrenceDate,
             LocalDateTime daySearchStart,
-            LocalDateTime daySearchEnd
+            LocalDateTime daySearchEnd,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         if (!isOccurrenceDate(schedule, occurrenceDate)) {
             return;
@@ -553,12 +603,21 @@ public class PromiseRecommendationService {
         LocalDateTime occurrenceEnd =
                 occurrenceStart.plus(duration);
 
+        boolean excluded = excludedStarts
+                .getOrDefault(schedule.scheduleId(), Set.of())
+                .contains(occurrenceStart);
+
+        if (excluded) {
+            return;
+        }
+
         if (!isOverlapping(occurrenceStart, occurrenceEnd, daySearchStart, daySearchEnd)) {
             return;
         }
 
         expandedSchedules.add(
                 new BusyScheduleTimeRange(
+                        schedule.scheduleId(),
                         schedule.userId(),
                         schedule.title(),
                         schedule.categoryName(),
@@ -1083,7 +1142,8 @@ public class PromiseRecommendationService {
     private Comparator<PromiseTimeRecommendationResponse> getFinalRecommendationComparator(
             PromiseTimeRecommendationSortType sortType,
             LocalDateTime now,
-            List<BusyScheduleTimeRange> busySchedules
+            List<BusyScheduleTimeRange> busySchedules,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         PromiseTimeRecommendationSortType effectiveSortType =
                 sortType == null ? PromiseTimeRecommendationSortType.RECOMMENDED : sortType;
@@ -1100,7 +1160,8 @@ public class PromiseRecommendationService {
                                     calculateRecommendationScore(
                                             recommendation,
                                             now,
-                                            busySchedules
+                                            busySchedules,
+                                            excludedStarts
                                     ),
                             Comparator.reverseOrder()
                     )
@@ -1169,12 +1230,13 @@ public class PromiseRecommendationService {
     private int calculateRecommendationScore(
             PromiseTimeRecommendationResponse recommendation,
             LocalDateTime now,
-            List<BusyScheduleTimeRange> busySchedules
+            List<BusyScheduleTimeRange> busySchedules,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         int participationScore = calculateParticipationScore(recommendation);
         int timePreferenceScore = calculateTimePreferenceScore(recommendation);
         int leadTimeScore = calculateLeadTimeScore(recommendation, now);
-        int adjacencyScore = calculateAdjacencyScore(recommendation, busySchedules);
+        int adjacencyScore = calculateAdjacencyScore(recommendation, busySchedules,excludedStarts);
 
         return participationScore
                 + timePreferenceScore
@@ -1284,7 +1346,8 @@ public class PromiseRecommendationService {
      */
     private int calculateAdjacencyScore(
             PromiseTimeRecommendationResponse recommendation,
-            List<BusyScheduleTimeRange> busySchedules
+            List<BusyScheduleTimeRange> busySchedules,
+            Map<Long, Set<LocalDateTime>> excludedStarts
     ) {
         Set<Long> availableMemberIds = recommendation.availableMembers().stream()
                 .map(PromiseRecommendationMemberResponse::userId)
@@ -1304,7 +1367,8 @@ public class PromiseRecommendationService {
                         busySchedules,
                         recommendationDate,
                         dayStart,
-                        dayEnd
+                        dayEnd,
+                        excludedStarts
                 );
 
         int totalScore = 0;

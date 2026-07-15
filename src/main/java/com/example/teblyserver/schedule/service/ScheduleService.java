@@ -9,11 +9,13 @@ import com.example.teblyserver.promise.domain.PromiseMemberStatus;
 import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.RepeatType;
 import com.example.teblyserver.schedule.domain.Schedule;
+import com.example.teblyserver.schedule.domain.ScheduleOccurrenceException;
 import com.example.teblyserver.schedule.dto.request.ScheduleRequestDto;
 import com.example.teblyserver.schedule.dto.request.ScheduleUpdateRequestDto;
 import com.example.teblyserver.schedule.dto.response.EventDto;
 import com.example.teblyserver.schedule.dto.response.ScheduleResponseDto;
 import com.example.teblyserver.schedule.repository.CategoryRepository;
+import com.example.teblyserver.schedule.repository.ScheduleOccurrenceExceptionRepository;
 import com.example.teblyserver.schedule.repository.ScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,8 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +37,7 @@ public class ScheduleService {
     private final ScheduleRepository scheduleRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final ScheduleOccurrenceExceptionRepository scheduleOccurrenceExceptionRepository;
     // private final FriendService friendService;
 
     // 일정 직접 추가
@@ -114,6 +116,9 @@ public class ScheduleService {
         }
 
         List<Schedule> originalSchedules = scheduleRepository.findSchedulesWithinRange(targetUserId, startDateTime, endDateTime);
+
+        Map<Long, Set<LocalDateTime>> excludedStarts =
+                loadExcludedOccurrenceStarts(originalSchedules);
         List<EventDto> resultDtos = new ArrayList<>();
 
         // 원본 일정을 순회하며 주간/월간 뷰에 맞게 일정을 복제
@@ -132,36 +137,67 @@ public class ScheduleService {
                     if (schedule.getRepeatUntil() != null && currentStart.isAfter(schedule.getRepeatUntil())) {
                         break;
                     }
-                    if (!currentEnd.isBefore(startDateTime)) {
+                    if (!currentEnd.isBefore(startDateTime)
+                            && !isExcluded(
+                                excludedStarts,
+                                schedule.getId(),
+                                currentStart
+                    )) {
                         resultDtos.add(EventDto.fromExpanded(schedule, loginUserId, currentStart, currentEnd));
                     }
 
                     // 다음 일정 시간으로 점프 (WEEKLY면 1주일 뒤로 이동)
-                    switch (schedule.getRepeatType()) {
-                        case DAILY -> {
-                            currentStart = currentStart.plusDays(1);
-                            currentEnd = currentEnd.plusDays(1);
-                        }
-                        case WEEKLY -> {
-                            currentStart = currentStart.plusWeeks(1);
-                            currentEnd = currentEnd.plusWeeks(1);
-                        }
-                        case MONTHLY -> {
-                            currentStart = currentStart.plusMonths(1);
-                            currentEnd = currentEnd.plusMonths(1);
-                        }
-                        case YEARLY -> {
-                            currentStart = currentStart.plusYears(1);
-                            currentEnd = currentEnd.plusYears(1);
-                        }
-                        default -> {
-                            throw new CustomException(ErrorCode.INVALID_INPUT);
-                        }
-                    }
+                    currentStart = nextOccurrence(
+                            currentStart,
+                            schedule.getRepeatType()
+                    );
+
+                    currentEnd = nextOccurrence(
+                            currentEnd,
+                            schedule.getRepeatType()
+                    );
                 }
             }
         }
         return resultDtos;
+    }
+
+    private Map<Long, Set<LocalDateTime>> loadExcludedOccurrenceStarts(List<Schedule> schedules) {
+
+        if (schedules.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> scheduleIds = schedules.stream()
+                .map(Schedule::getId)
+                .toList();
+
+        List<ScheduleOccurrenceException> exceptions =
+                scheduleOccurrenceExceptionRepository
+                        .findAllBySchedule_IdIn(scheduleIds);
+
+        Map<Long, Set<LocalDateTime>> result = new HashMap<>();
+
+        for (ScheduleOccurrenceException exception : exceptions) {
+            Long scheduleId = exception.getSchedule().getId();
+
+            result.computeIfAbsent(
+                    scheduleId,
+                    ignored -> new HashSet<>()
+            ).add(exception.getOccurrenceStartTime());
+        }
+
+        return result;
+    }
+
+    private boolean isExcluded(
+            Map<Long, Set<LocalDateTime>> excludedStarts,
+            Long scheduleId,
+            LocalDateTime occurrenceStart
+    ) {
+        return excludedStarts
+                .getOrDefault(scheduleId, Set.of())
+                .contains(occurrenceStart);
     }
 
     /**
@@ -187,7 +223,16 @@ public class ScheduleService {
             throw new CustomException(ErrorCode.SCHEDULE_FORBIDDEN);
         }
 
-        // 3. [카테고리 변경 처리 및 권한 검증]
+        /*
+         * 3. 수정하기 전 반복 규칙을 보관한다.
+         *
+         * LocalDateTime과 RepeatType은 변경 불가능 객체/Enum이므로
+         * 현재 값을 그대로 변수에 보관해도 된다.
+         */
+        LocalDateTime oldStartTime = schedule.getStartTime();
+        RepeatType oldRepeatType = schedule.getRepeatType();
+
+        // 4. [카테고리 변경 처리 및 권한 검증]
         // DTO에 categoryId가 넘어왔다면, 해당 카테고리를 조회하고 내 것인지 검증
         Category category = null;
         if (dto.categoryId() != null) {
@@ -200,12 +245,13 @@ public class ScheduleService {
             }
         }
 
+        // 5. 수정 요청에 값이 없으면 기존 시작/종료 시각 사용
         LocalDateTime newStartTime = dto.startTime() != null ? dto.startTime() : schedule.getStartTime();
         LocalDateTime newEndTime = dto.endTime() != null ? dto.endTime() : schedule.getEndTime();
         validateScheduleTime(newStartTime, newEndTime);
 
 
-        // 4. 엔티티의 값을 변경
+        // 6. 실제 Schedule Entity 수정
         schedule.update(
                 category,
                 dto.title(),
@@ -219,7 +265,34 @@ public class ScheduleService {
         );
 
 
-        // 별도로 repository.save()를 하지 않아도 됨, @Transactional 덕분에 Dirty-checking
+        /*
+         * 7. 수정 전 값과 수정 후 값을 비교한다.
+         *
+         * Objects.equals를 사용하면 혹시 값이 null이어도
+         * NullPointerException 없이 비교할 수 있다.
+         */
+        boolean startTimeChanged =
+                !Objects.equals(
+                        oldStartTime,
+                        schedule.getStartTime()
+                );
+
+        boolean repeatTypeChanged =
+                oldRepeatType != schedule.getRepeatType();
+
+        boolean recurrenceRuleChanged =
+                startTimeChanged || repeatTypeChanged;
+
+        /*
+         * 8. 시작 시각 또는 반복 유형이 변경되었다면
+         * 기존 특정 회차 삭제 예외를 모두 제거한다.
+         */
+        if (recurrenceRuleChanged) {
+            scheduleOccurrenceExceptionRepository
+                    .deleteAllBySchedule_Id(scheduleId);
+        }
+
+        // Dirty checking으로 Schedule 변경 내용 반영
         return schedule.getId();
     }
 
@@ -237,6 +310,92 @@ public class ScheduleService {
 
         // 3. soft-delete 수행 (상태값만 true로 변경)
         schedule.delete();
+    }
+
+    // 반복 일정 중 단일 회차 삭제
+    @Transactional
+    public void deleteScheduleOccurrence(
+            Long userId,
+            Long scheduleId,
+            LocalDateTime occurrenceStart
+    ) {
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() ->
+                        new CustomException(ErrorCode.SCHEDULE_NOT_FOUND)
+                );
+
+        if (!schedule.getUser().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.SCHEDULE_FORBIDDEN);
+        }
+
+        if (schedule.getRepeatType() == RepeatType.NONE) {
+            throw new CustomException(
+                    ErrorCode.INVALID_SCHEDULE_OCCURRENCE
+            );
+        }
+
+        // 실제 반복 일정인지 확인 -> 아니라면 예외
+        // 이 검증이 없으면 매주 화요일 일정에 대해 실수로 수요일 날짜를 보내도 예외 데이터가 저장됨
+        if (!isValidOccurrenceStart(schedule, occurrenceStart)) {
+            throw new CustomException(ErrorCode.INVALID_SCHEDULE_OCCURRENCE);
+        }
+
+        // 동일 요청을 여러 번 보내더라도 성공으로 처리
+        boolean alreadyDeleted = scheduleOccurrenceExceptionRepository
+                        .existsBySchedule_IdAndOccurrenceStartTime(scheduleId, occurrenceStart);
+
+        if (alreadyDeleted) {
+            return;
+        }
+
+        ScheduleOccurrenceException exception =
+                ScheduleOccurrenceException.create(
+                        schedule,
+                        occurrenceStart
+                );
+
+        scheduleOccurrenceExceptionRepository.save(exception);
+    }
+
+    // 실제 반복일정인지 확인하는 로직
+    private boolean isValidOccurrenceStart(
+            Schedule schedule,
+            LocalDateTime requestedStart
+    ) {
+        LocalDateTime current = schedule.getStartTime();
+
+        if (requestedStart.isBefore(current)) {
+            return false;
+        }
+
+        if (schedule.getRepeatUntil() != null
+                && requestedStart.isAfter(schedule.getRepeatUntil())) {
+            return false;
+        }
+
+        while (current.isBefore(requestedStart)) {
+            current = nextOccurrence(
+                    current,
+                    schedule.getRepeatType()
+            );
+        }
+
+        return current.equals(requestedStart);
+    }
+
+    private LocalDateTime nextOccurrence(
+            LocalDateTime current,
+            RepeatType repeatType
+    ) {
+        return switch (repeatType) {
+            case DAILY -> current.plusDays(1);
+            case WEEKLY -> current.plusWeeks(1);
+            case MONTHLY -> current.plusMonths(1);
+            case YEARLY -> current.plusYears(1);
+            case NONE -> throw new CustomException(
+                    ErrorCode.INVALID_SCHEDULE_OCCURRENCE
+            );
+        };
     }
 
 
