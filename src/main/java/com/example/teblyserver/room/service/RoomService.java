@@ -188,7 +188,7 @@ public class RoomService {
     }
 
     /**
-     * 방 멤버 목록 조회 (ACCEPTED 멤버만)
+     * 방 멤버 목록 조회 (ACCEPTED + PENDING 모두 포함, status로 구분)
      */
     public List<RoomMemberResponse> getMembers(Long userId, Long roomId) {
 
@@ -203,35 +203,13 @@ public class RoomService {
             throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
         }
 
-        return roomMemberRepository.findByRoomIdAndInviteStatusAndIsDeletedFalse(roomId, InviteStatus.ACCEPTED)
+        return roomMemberRepository.findByRoomIdAndIsDeletedFalse(roomId)
                 .stream()
+                .filter(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED || rm.getInviteStatus() == InviteStatus.PENDING)
                 .map(RoomMemberResponse::of)
                 .toList();
     }
 
-    /**
-     * 방 초대 대기(PENDING) 목록 조회
-     * 호스트가 이미 초대한 친구를 다시 확인할 수 있도록 제공
-     */
-    public List<RoomMemberResponse> getPendingInvitations(Long userId, Long roomId) {
-
-        roomRepository.findById(roomId)
-                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
-
-        boolean isMember = roomMemberRepository.findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
-                .stream()
-                .anyMatch(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED);
-
-        if (!isMember) {
-            throw new CustomException(ErrorCode.ROOM_FORBIDDEN);
-        }
-
-        return roomMemberRepository.findByRoomIdAndInviteStatusAndIsDeletedFalse(roomId, InviteStatus.PENDING)
-                .stream()
-                .map(RoomMemberResponse::of)
-                .toList();
-    }
-    
     /**
      * 멤버 초대 (PENDING 레코드 생성)
      */

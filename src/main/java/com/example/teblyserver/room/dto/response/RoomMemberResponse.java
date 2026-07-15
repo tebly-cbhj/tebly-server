@@ -1,8 +1,8 @@
 package com.example.teblyserver.room.dto.response;
 
+import com.example.teblyserver.room.domain.InviteStatus;
 import com.example.teblyserver.room.domain.RoomMember;
 import com.example.teblyserver.room.domain.RoomRole;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 
@@ -11,6 +11,7 @@ public record RoomMemberResponse(
         String nickname,
         String profileImage,
         RoomRole role,
+        InviteStatus status,
         LocalDateTime createdAt
 ) {
 
@@ -20,6 +21,7 @@ public record RoomMemberResponse(
                 member.getUser().getNickname(),
                 member.getUser().getProfileImageUrl(),
                 member.getRole(),
+                member.getInviteStatus(),
                 member.getCreatedAt()
         );
     }
