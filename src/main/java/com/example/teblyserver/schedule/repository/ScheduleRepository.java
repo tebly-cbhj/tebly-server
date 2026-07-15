@@ -40,6 +40,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     // 추천 탐색 범위와 조금이라도 겹치는 일정을 가져오겠다는 쿼리
     @Query("""
         select new com.example.teblyserver.promise.dto.internal.BusyScheduleTimeRange(
+            s.id,
             s.user.id,
             s.title,
             s.category.name,
