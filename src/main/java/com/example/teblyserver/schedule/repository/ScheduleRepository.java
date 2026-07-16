@@ -46,6 +46,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             s.category.name,
             s.startTime,
             s.endTime,
+            s.repeatUntil,
             s.repeatType
         )
         from Schedule s

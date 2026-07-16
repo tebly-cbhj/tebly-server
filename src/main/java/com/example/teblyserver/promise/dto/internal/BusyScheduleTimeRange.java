@@ -19,6 +19,7 @@ public record BusyScheduleTimeRange(
         String categoryName,
         LocalDateTime startTime,
         LocalDateTime endTime,
+        LocalDateTime repeatUntil,
         RepeatType repeatType
 ) {
 }

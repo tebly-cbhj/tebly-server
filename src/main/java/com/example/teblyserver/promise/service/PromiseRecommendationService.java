@@ -623,6 +623,7 @@ public class PromiseRecommendationService {
                         schedule.categoryName(),
                         occurrenceStart,
                         occurrenceEnd,
+                        schedule.repeatUntil(),
                         schedule.repeatType()
                 )
         );
@@ -636,6 +637,14 @@ public class PromiseRecommendationService {
         LocalDate originalDate = schedule.startTime().toLocalDate();
 
         if (occurrenceDate.isBefore(originalDate)) {
+            return false;
+        }
+
+        LocalDateTime occurrenceStart =
+                occurrenceDate.atTime(schedule.startTime().toLocalTime());
+
+        if (schedule.repeatUntil() != null
+                && occurrenceStart.isAfter(schedule.repeatUntil())) {
             return false;
         }
 
