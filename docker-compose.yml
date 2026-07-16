@@ -21,7 +21,7 @@ services:
 
   # 2. Spring Boot 애플리케이션 서비스
   app:
-    build: .
+    image: ghcr.io/tebly-cbhj/tebly-server:latest
     container_name: spring-app
     ports:
       - "8080:8080"
