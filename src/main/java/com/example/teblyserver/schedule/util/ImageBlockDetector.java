@@ -31,8 +31,13 @@ public class ImageBlockDetector {
     private static final int PIXEL_MIN_BRIGHTNESS = 50;
     /** 배경 픽셀 판별: 최대 채널값이 이 이상이면 흰색 텍스트 픽셀로 제외 */
     private static final int PIXEL_MAX_BRIGHTNESS = 220;
-    /** 색 경계 판정 hue 임계값(도) — 이 값 이상이면 다른 색으로 판단 */
-    private static final int HUE_CHANGE_THRESHOLD = 30;
+    /**
+     * 색 경계 판정 hue 임계값(도) — 이 값 이상이면 다른 색으로 판단.
+     * 에브리타임 팔레트의 코랄(≈5°)·오렌지(≈28°)처럼 22~25° 차이 나는 인접 블록도
+     * 분리해야 하므로 20°로 설정. 텍스트 안티앨리어싱(흰색 혼합)은 hue를 보존하고
+     * COLOR_BOUNDARY_ROW_RATIO의 연속 행 게이트가 일시적 튐을 걸러주므로 안전하다.
+     */
+    private static final int HUE_CHANGE_THRESHOLD = 20;
     /** 색 경계로 인정하는 최소 연속 행 수 기준 비율 (pixelsPerHour × 이 비율) */
     private static final double COLOR_BOUNDARY_ROW_RATIO = 0.15;
     /** 시간 눈금 OCR 탐지: 이미지 너비 대비 왼쪽 여백 비율 */
@@ -181,16 +186,18 @@ public class ImageBlockDetector {
         }
 
         // 2차 패스: 12시간 표기 보완 (1~8 → 13~20)
-        // 에브리타임 등에서 오후 시각을 "1","2","3"... 으로 표기하는 경우 처리
-        Double y12 = hourToY.get(12);
-        if (y12 != null) {
+        // 에브리타임 등에서 오후 시각을 "1","2","3"... 으로 표기하는 경우 처리.
+        // 앵커는 1차 패스에서 감지된 가장 아래 눈금 — "12"가 OCR에서 누락돼도
+        // (예: 9,10,11만 인식) 오후 라벨을 잃지 않도록 특정 시각에 하드코딩하지 않는다.
+        if (!hourToY.isEmpty()) {
+            double pmAnchorY = Collections.max(hourToY.values());
             for (ClovaOcrApiResponse.Field f : fields) {
                 if (!hasBoundingPoly(f) || f.getInferText() == null) continue;
                 try {
                     int num = Integer.parseInt(f.getInferText().trim());
                     if (num < 1 || num > 8) continue;              // PM 라벨 범위
                     if (avgX(f) > minNumericX * 3.0) continue;     // 왼쪽 열 한정
-                    if (minY(f) <= y12) continue;                   // "12" 눈금 아래에만
+                    if (minY(f) <= pmAnchorY) continue;             // 마지막 오전 눈금 아래에만
 
                     int    hour = num + 12;
                     double cy   = minY(f);
@@ -489,9 +496,9 @@ public class ImageBlockDetector {
                     || hueDiff(cur[2], next[2]) < HUE_CHANGE_THRESHOLD;
             if (gapOk && colorOk) {
                 cur[1] = next[1];
-                cur[2] = (cur[2] >= 0 && next[2] >= 0)
-                        ? (cur[2] + next[2]) / 2
-                        : (cur[2] >= 0 ? cur[2] : next[2]);
+                // hue는 원형값(0~359)이라 산술평균하면 0/360 경계에서 엉뚱한 값이 됨
+                // (예: 358과 10의 평균 184). 병합 조건이 이미 '거의 같은 색'이므로 기존 hue 유지.
+                if (cur[2] < 0) cur[2] = next[2];
             } else {
                 merged.add(cur);
                 cur = next.clone();
@@ -501,10 +508,24 @@ public class ImageBlockDetector {
         return merged;
     }
 
-    /** 유채색 배경 픽셀 판별: 흰색 텍스트(max > {@value PIXEL_MAX_BRIGHTNESS})와 검정 격자(max < {@value PIXEL_MIN_BRIGHTNESS}) 제외. */
+    /**
+     * hue 집계에 쓸 배경 픽셀 판별: 검정 격자·텍스트(max < {@value PIXEL_MIN_BRIGHTNESS})와
+     * 흰색 텍스트(밝으면서 무채색인 픽셀)만 제외.
+     *
+     * <p>밝기 상한을 무조건 적용하면 코랄(R=231)·오렌지(R=246)처럼 한 채널이
+     * {@value PIXEL_MAX_BRIGHTNESS}를 넘는 밝은 블록 색 자체가 hue 집계에서 빠져
+     * rowHue가 항상 -1이 되고, 그 결과 인접 블록의 색 경계 감지가 통째로 비활성화된다.
+     * 흰색 텍스트는 '밝고 채도가 낮다'는 점이 본질이므로 채도 조건을 함께 본다.
+     */
     private static boolean isBackgroundPixel(int argb) {
-        int max = Math.max((argb >> 16) & 0xFF, Math.max((argb >> 8) & 0xFF, argb & 0xFF));
-        return max >= PIXEL_MIN_BRIGHTNESS && max <= PIXEL_MAX_BRIGHTNESS;
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8)  & 0xFF;
+        int b =  argb        & 0xFF;
+        int max = Math.max(r, Math.max(g, b));
+        int min = Math.min(r, Math.min(g, b));
+        if (max < PIXEL_MIN_BRIGHTNESS) return false;                    // 검정 격자/어두운 텍스트
+        if (max > PIXEL_MAX_BRIGHTNESS && (max - min) < 30) return false; // 흰색 텍스트(밝은 무채색)
+        return true;
     }
 
     /** 픽셀의 hue 각도(0~359)를 반환합니다. 무채색이면 0. */
