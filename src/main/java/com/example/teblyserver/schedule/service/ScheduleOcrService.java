@@ -60,6 +60,34 @@ public class ScheduleOcrService {
     private static final Pattern LECTURE_ROOM_PATTERN =
             Pattern.compile("[가-힣A-Za-z()]{2,8}\\s?[A-Za-z]?\\d{3,5}");
 
+    // 강의실 코드 한 줄 패턴: "T0101", "C526", "학412", "포B161", "21203" 등
+    // (건물 약칭 0~4자 + 호실 숫자 2~5자리로만 이뤄진 줄 → 제목이 아니라 위치 줄)
+    private static final Pattern COMPACT_ROOM_CODE_PATTERN =
+            Pattern.compile("^[가-힣A-Za-z]{0,4}\\d{2,5}$");
+
+    // 건물명 단독 줄 패턴: "정보과학관"처럼 호실 없이 건물명만 적힌 위치 줄
+    private static final Pattern BUILDING_ONLY_PATTERN =
+            Pattern.compile("^[가-힣]{2,10}(관|홀|당)$");
+
+    /**
+     * 제목 대비 상세줄(교수명·장소) 폰트 높이 비율 임계값.
+     * 에브리타임류 시간표는 상세줄을 제목의 ~70% 크기로 렌더링하므로,
+     * OCR 박스 높이 노이즈(±10% 내외)를 감안해 0.82 미만이면 상세줄로 판정한다.
+     */
+    private static final double DETAIL_FONT_RATIO = 0.82;
+
+    // 교수명으로 추정되는 줄 패턴: 2~4자 순수 한글.
+    // 단독으로는 제목 이어쓰기 조각("산업", "텔링" 등)과 구분할 수 없으므로,
+    // "성씨로 시작" + "바로 다음 줄이 장소 줄"이라는 조건과 반드시 함께 사용한다.
+    private static final Pattern PERSON_NAME_PATTERN = Pattern.compile("^[가-힣]{2,4}$");
+
+    // 주요 한국 성씨(단자) — 교수명 줄 판정 시 첫 글자 확인용.
+    // "텔링"(제목 조각)은 성씨로 시작하지 않아 걸러지고, "정은혜"는 성씨 시작이라 교수명으로 판정된다.
+    // 주의: 초희귀 성씨(어·설·석 등)까지 넣으면 제목 이어쓰기 조각과 충돌한다.
+    // 실제로 "프로그래밍언/어론" 의 "어론"이 어씨 교수명으로 오판된 사례가 있어 상위 성씨만 유지한다.
+    private static final String KOREAN_SURNAME_CHARS =
+            "김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진지엄채원천방공현함변염여추";
+
     private final ClovaOcrClient clovaOcrClient;
     private final UserRepository userRepository;
     private final ScheduleRepository scheduleRepository;
@@ -286,7 +314,7 @@ public class ScheduleOcrService {
                 DetectedBlock block = entry.getKey();
                 List<ClovaOcrApiResponse.Field> blockFields = entry.getValue();
 
-                String title = buildTitleByFirstGroup(blockFields, pixelsPerHour);
+                String title = buildTitle(blockFields, pixelsPerHour);
                 if (title.isBlank()) {
                     title = "기타";
                     log.debug("텍스트 미매핑 블록 → 기타: {} {}~{}",
@@ -321,17 +349,31 @@ public class ScheduleOcrService {
     // ── title 조합 ───────────────────────────────────────────────────────────
 
     /**
-     * 블록에 매핑된 Field 중 y좌표 기준 첫 번째 그룹만 이어붙여 title을 반환합니다.
+     * 블록에 매핑된 Field를 줄 단위로 묶은 뒤, 위에서부터 이어지는 줄들을 제목으로 이어붙입니다.
      *
      * <ol>
-     *   <li>Field를 y좌표 오름차순 정렬</li>
-     *   <li>첫 번째 Field의 y ± (pixelsPerHour * 0.3) 이내인 Field만 채택</li>
-     *   <li>공백 없이 이어붙임 (예: "브랜드스토리" + "텔링" → "브랜드스토리텔링")</li>
+     *   <li>Field를 y좌표 오름차순 정렬 후 근접한 y끼리 한 줄로 클러스터링</li>
+     *   <li>첫 줄부터 아래로 체인 — 좁은 컬럼에서 3줄 이상으로 감긴 긴 제목도 온전히 복원
+     *       (예: "사용자인" + "터페이스" + "및실습(나)")</li>
+     *   <li>강의실/건물 위치 줄에서 중단 — "정보과학관 21203", "T0101", "학412", "정보과학관" 등은
+     *       제목에 포함하지 않음</li>
+     *   <li>첫 줄보다 작은 폰트(필드 높이 &lt; {@value #DETAIL_FONT_RATIO}배) 줄에서 중단 —
+     *       에브리타임류 시간표는 교수명·장소 줄을 제목보다 작은 폰트로 렌더링하므로,
+     *       패턴으로 못 잡는 교수명("정은혜")·비정형 장소("한경직기념관 08")도 여기서 걸러짐</li>
+     *   <li>교수명 줄(2~4자 순수 한글 + 성씨 시작 + 바로 다음 줄이 장소 줄)에서 중단 —
+     *       CLOVA 박스 높이 노이즈로 폰트 크기 판정이 빗나가도, '제목 → 교수명 → 장소'라는
+     *       블록 구조와 성씨 사전으로 교수명을 걸러냄</li>
+     *   <li>줄 간격이 벌어지면(1.8×줄높이 초과) 제목 종료로 간주</li>
+     *   <li>공백 없이 이어붙임 (한국어 줄바꿈은 단어 중간에서 끊기므로)</li>
      *   <li>pixelsPerHour를 알 수 없을 때(≤0)는 전체 Field를 이어붙임</li>
      * </ol>
+     *
+     * <p>한계: 제목의 마지막 이어쓰기 조각이 성씨로 시작하는 2~4자 순수 한글("설계", "구조" 등)이면서
+     * 교수명 없이 곧바로 장소 줄이 이어지는 드문 배치에서는 그 조각이 교수명으로 오인되어 잘릴 수 있다.
+     *
+     * <p>package-private: 테스트에서 제목 조립 규칙을 직접 검증하기 위해 접근 허용.
      */
-    private String buildTitleByFirstGroup(
-            List<ClovaOcrApiResponse.Field> fields, double pixelsPerHour) {
+    String buildTitle(List<ClovaOcrApiResponse.Field> fields, double pixelsPerHour) {
         if (fields.isEmpty()) return "";
 
         if (pixelsPerHour <= 0) {
@@ -344,22 +386,99 @@ public class ScheduleOcrService {
                 .sorted(Comparator.comparingDouble(this::fieldCenterY))
                 .collect(Collectors.toList());
 
-        ClovaOcrApiResponse.Field firstField = sorted.get(0);
-        double firstY     = fieldCenterY(firstField);
-        double lineHeight = fieldHeight(firstField);
-        double threshold  = lineHeight > 2 ? lineHeight * 1.5 : pixelsPerHour * 0.15;
+        double lineHeight = fieldHeight(sorted.get(0));
+        if (lineHeight <= 2) lineHeight = pixelsPerHour * 0.15;
 
-        return sorted.stream()
-                .filter(f -> Math.abs(fieldCenterY(f) - firstY) <= threshold)
-                .map(f -> f.getInferText().trim())
-                .collect(Collectors.joining());
+        // 1) y가 근접한 Field끼리 한 줄로 클러스터링
+        List<List<ClovaOcrApiResponse.Field>> lines = new ArrayList<>();
+        for (ClovaOcrApiResponse.Field f : sorted) {
+            if (!lines.isEmpty()) {
+                List<ClovaOcrApiResponse.Field> lastLine = lines.get(lines.size() - 1);
+                double lastLineY = fieldCenterY(lastLine.get(0));
+                if (Math.abs(fieldCenterY(f) - lastLineY) <= lineHeight * 0.6) {
+                    lastLine.add(f);
+                    continue;
+                }
+            }
+            lines.add(new ArrayList<>(List.of(f)));
+        }
+
+        // 첫 줄(제목) 폰트 높이 — 이후 줄의 상세줄(교수/장소) 여부 판정 기준
+        double titleFontHeight = medianFieldHeight(lines.get(0));
+
+        // 줄별 텍스트 미리 계산 (교수명 판정 시 다음 줄 look-ahead에 필요)
+        List<String> lineTexts    = new ArrayList<>();
+        List<String> lineCompacts = new ArrayList<>();
+        for (List<ClovaOcrApiResponse.Field> line : lines) {
+            line.sort(Comparator.comparingDouble(this::fieldCenterX));
+            String text = line.stream()
+                    .map(f -> f.getInferText().trim())
+                    .collect(Collectors.joining(" "));
+            lineTexts.add(text);
+            lineCompacts.add(text.replaceAll("\\s+", ""));
+        }
+
+        // 2) 위에서부터 체인으로 제목 줄 채택 (위치 줄·교수명 줄·작은 폰트 줄·큰 세로 간격에서 중단)
+        StringBuilder title = new StringBuilder();
+        double prevLineY = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            List<ClovaOcrApiResponse.Field> line = lines.get(i);
+            double lineY   = fieldCenterY(line.get(0));
+            String text    = lineTexts.get(i);
+            String compact = lineCompacts.get(i);
+
+            if (i > 0) {
+                if (lineY - prevLineY > lineHeight * 1.8) break; // 줄 간격 벌어짐 → 제목 종료
+                if (isLocationLine(text, compact)) break;         // 강의실/건물 줄 → 제목 종료
+                // 폰트 크기 판정은 3자 이상 줄에만 적용 — "크", ")", "어론" 같은 1~2자
+                // 이어쓰기 조각은 글리프 잉크가 적어 OCR 박스 높이가 실제 폰트보다 작게
+                // 측정되는 경우가 잦아(받침 없는 글자·괄호 등), 상세줄로 오판하면 제목
+                // 마지막 글자가 잘린다. 1~2자 교수명 줄은 구조 규칙(아래)이 커버한다.
+                if (titleFontHeight > 2
+                        && compact.length() >= 3
+                        && medianFieldHeight(line) < titleFontHeight * DETAIL_FONT_RATIO) {
+                    break; // 제목보다 작은 폰트 → 교수명/장소 상세줄 → 제목 종료
+                }
+                // 교수명 줄(구조 기반): 2~4자 순수 한글 + 성씨로 시작 + 바로 다음 줄이 장소 줄.
+                // 에브리타임 블록은 항상 '제목 → 교수명 → 장소' 순서이므로, 폰트 높이가
+                // OCR 노이즈로 비슷하게 측정돼도 이 구조 조건으로 교수명을 걸러낼 수 있다.
+                // - "산업"(조각): 다음 줄이 교수명(장소 아님) → 유지
+                // - "텔링"(조각, 바로 아래가 장소): 성씨 시작이 아님 → 유지
+                if (PERSON_NAME_PATTERN.matcher(compact).matches()
+                        && KOREAN_SURNAME_CHARS.indexOf(compact.charAt(0)) >= 0
+                        && i + 1 < lines.size()
+                        && isLocationLine(lineTexts.get(i + 1), lineCompacts.get(i + 1))) {
+                    break;
+                }
+            }
+
+            title.append(compact);
+            prevLineY = lineY;
+        }
+        return title.toString();
+    }
+
+    /** 줄을 구성하는 Field들의 중앙값 높이 (OCR 박스 높이 노이즈에 강건하도록 median 사용). */
+    private double medianFieldHeight(List<ClovaOcrApiResponse.Field> line) {
+        List<Double> heights = line.stream()
+                .map(this::fieldHeight)
+                .sorted()
+                .collect(Collectors.toList());
+        return heights.get(heights.size() / 2);
+    }
+
+    /** 강의실·건물 위치로 보이는 줄인지 판별 (제목 체인 중단 조건). */
+    private boolean isLocationLine(String text, String compact) {
+        return LECTURE_ROOM_PATTERN.matcher(text).find()
+                || COMPACT_ROOM_CODE_PATTERN.matcher(compact).matches()
+                || BUILDING_ONLY_PATTERN.matcher(compact).matches();
     }
 
     // ── 카테고리 추정 ────────────────────────────────────────────────────────
 
     /**
      * 블록 전체 텍스트(강의실·교수명 포함)를 기반으로 카테고리를 추정합니다.
-     * title 조립(buildTitleByFirstGroup)과 달리 첫 그룹만이 아닌 blockFields 전부를 사용합니다.
+     * title 조립(buildTitle)과 달리 위치 줄 등을 제외하지 않고 blockFields 전부를 사용합니다.
      *
      * <ol>
      *   <li>텍스트가 비어있으면 ETC</li>
