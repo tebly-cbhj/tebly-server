@@ -61,7 +61,7 @@ jwt:
 
 file:
   upload-dir: /app/uploads
-  base-url: https://tebly.org/images
+  base-url: https://api.tebly.org/images
 
 springdoc:
   swagger-ui:
