@@ -384,6 +384,8 @@ public class DecisionHelperService {
      * 일치하는 후보가 없으면, candidates.get(0)(알고리즘의 sortType 정렬 순서) 대신
      * 프롬프트에 지시한 우선순위(가용인원 → 인접일정 촉박도 → 긴 시간 → 이른 시간)와
      * 동일한 기준으로 별도 정렬한 첫 번째 후보로 대체한다.
+     * 단, 프롬프트의 2순위(약속 이름이 암시하는 시간대 매칭)는 제목의 의미 해석이 필요해
+     * 알고리즘으로 재현하지 않는다 — fallback은 어디까지나 LLM 오응답 시의 근사치다.
      */
     private LLMDecisionResponseDto validateRecommendedSlotId(LLMDecisionResponseDto parsed, List<CandidateSlotDto> candidates) {
         boolean isValidSlotId = candidates.stream()
@@ -410,7 +412,7 @@ public class DecisionHelperService {
         );
     }
 
-    // 프롬프트와 동일한 우선순위(가용인원 → 인접일정 촉박도 → 긴 시간 → 이른 시간)로 정렬한 1순위 후보
+    // 프롬프트 우선순위 중 알고리즘으로 판단 가능한 기준(가용인원 → 인접일정 촉박도 → 긴 시간 → 이른 시간)으로 정렬한 1순위 후보
     // package-private: DecisionHelperServiceTest에서 정렬 우선순위를 직접 검증하기 위해 접근 허용
     CandidateSlotDto resolveFallbackCandidate(List<CandidateSlotDto> candidates) {
         return candidates.stream()
