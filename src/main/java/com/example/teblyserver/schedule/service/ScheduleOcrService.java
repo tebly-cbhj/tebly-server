@@ -8,6 +8,7 @@ import com.example.teblyserver.schedule.client.ClovaOcrClient;
 import com.example.teblyserver.schedule.client.dto.ClovaOcrApiResponse;
 import com.example.teblyserver.schedule.domain.Category;
 import com.example.teblyserver.schedule.domain.OcrCategoryType;
+import com.example.teblyserver.schedule.domain.RepeatType;
 import com.example.teblyserver.schedule.domain.Schedule;
 import com.example.teblyserver.schedule.dto.OcrScheduleItem;
 import com.example.teblyserver.schedule.dto.ScheduleOcrResponse;
@@ -330,6 +331,7 @@ public class ScheduleOcrService {
                         .endTime(normalizeTime(block.getEndTime()))
                         .title(title)
                         .categoryType(categoryType)
+                        .repeatType(RepeatType.WEEKLY)
                         .build());
 
                 String mappedTexts = blockFields.stream()

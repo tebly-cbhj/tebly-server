@@ -49,6 +49,20 @@ public class PromptBuilder {
             1번(가용 인원)이 같은 후보들 사이에서는, 2번이 3번(긴 시간)·4번(이른 시간)보다 항상 우선해요.
             즉 촉박한 인원이 없는 후보라면, 조금 더 짧거나 늦은 시간이어도 그 후보를 선택할 수 있어요.
 
+            [후보 구간 안에서 실제 제안 시간 정하기]
+            입력에는 minDurationMinutes(약속 최소 시간)와 promiseTitle(약속 이름)이 함께 주어져요.
+            선택한 후보(recommendedSlotId)의 durationMinutes가 minDurationMinutes + 120(2시간)을 넘으면,
+            후보 구간 전체를 그대로 쓰지 말고 그 안에서 실제로 만나기 적당한 구간으로 좁혀서
+            finalStartTime/finalEndTime(HH:mm)으로 정하세요.
+            - 좁힌 구간은 반드시 후보의 startTime~endTime 범위 안에 있어야 하고, 길이는 minDurationMinutes 이상이어야 해요
+            - 길이는 minDurationMinutes에 억지로 맞추지 말고, 실제 약속에 자연스러운 정도(보통 1~3시간)로 적당히 정하세요
+            - promiseTitle에 시간대를 암시하는 단어가 있으면 그 시간대에 맞춰 구간을 배치하세요
+              (예: "점심"/"런치"/"브런치" → 11:30~14:00대, "저녁"/"디너"/"회식"/"술" → 18:00~21:00대,
+              "아침"/"조식" → 07:00~09:00대). 단, 후보 구간 밖으로 벗어나면 안 되니 겹치는 부분만 활용하세요
+            - promiseTitle에 특별한 시간대 단서가 없으면 촉박한 인접 일정이 적은 쪽을 우선해 자연스러운 구간을 고르세요
+            후보의 durationMinutes가 minDurationMinutes + 120 이하라면 굳이 좁히지 말고
+            finalStartTime/finalEndTime을 후보의 startTime/endTime과 동일하게 그대로 반환하세요.
+
             [인접 일정 판단 기준]
             각 후보의 beforeSlot/afterSlot에는 인접 일정의 제목과 간격(gapMinutes)이 담겨 있어요.
             간격 숫자만 보지 말고, 일정 제목이 나타내는 활동 종류를 함께 고려해
@@ -89,6 +103,8 @@ public class PromptBuilder {
 
             출력 규칙:
             - recommendedSlotId는 반드시 candidates에 존재하는 slotId 중 하나여야 해요
+            - finalStartTime/finalEndTime은 반드시 "HH:mm" 형식이고, recommendedSlotId 후보의
+              startTime~endTime 범위 안에 있어야 해요 (범위를 벗어나면 서버가 무시하고 후보 전체 구간으로 대체해요)
             - 특정 멤버의 참여 이력이나 선호도를 근거로 언급하지 마세요
               (예: "최근 참여가 적으셨던", "~님 선호 시간대라서" 금지)
             - 특정 멤버의 인접 일정을 실명으로 언급하지 말고, "일부 멤버가 이동 시간이 촉박할 수 있어" 처럼 일반화해서 표현하세요
@@ -96,7 +112,7 @@ public class PromptBuilder {
               (예: "가능합니다" 대신 "가능해요", "추천합니다" 대신 "추천해요")
 
             [후보 있을 때 출력 형식]
-            {"type": "recommendation", "recommendedSlotId": "...", "reason": "...", "alternativeNote": "..."}
+            {"type": "recommendation", "recommendedSlotId": "...", "finalStartTime": "HH:mm", "finalEndTime": "HH:mm", "reason": "...", "alternativeNote": "..."}
 
             [후보 없을 때 출력 형식]
             {"type": "alternative", "proposedSlot": {"date": "...", "startTime": "...", "endTime": "...", "summary": "..."}}
@@ -109,16 +125,23 @@ public class PromptBuilder {
     }
 
     /**
-     * 후보가 있을 때: 가용성 기반 후보 목록을 JSON으로 직렬화해 삽입.
+     * 후보가 있을 때: 가용성 기반 후보 목록과 함께 약속 이름/최소 시간을 JSON으로 직렬화해 삽입.
+     * promiseTitle/minDurationMinutes는 선택한 후보 구간을 얼마나·언제로 좁힐지(finalStartTime/finalEndTime)
+     * 판단하는 데 쓰인다.
      */
-    public String buildComparisonPrompt(List<CandidateSlotDto> candidates) {
-        String candidatesJson = toJson(Map.of("candidates", candidates));
+    public String buildComparisonPrompt(List<CandidateSlotDto> candidates, String promiseTitle, int minDurationMinutes) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("promiseTitle", promiseTitle);
+        payload.put("minDurationMinutes", minDurationMinutes);
+        payload.put("candidates", candidates);
+
+        String payloadJson = toJson(payload);
 
         return """
                 다음은 추천된 약속 시간 후보들입니다. 가장 적합한 시간대 하나를 선택해 추천해주세요.
 
                 %s
-                """.formatted(candidatesJson);
+                """.formatted(payloadJson);
     }
 
     /**

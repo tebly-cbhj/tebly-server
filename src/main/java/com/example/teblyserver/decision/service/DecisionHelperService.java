@@ -23,7 +23,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -101,7 +103,7 @@ public class DecisionHelperService {
             );
         } else {
             candidates = toCandidateSlots(recommendations);
-            userPrompt = promptBuilder.buildComparisonPrompt(candidates);
+            userPrompt = promptBuilder.buildComparisonPrompt(candidates, request.title(), request.minDuration());
         }
 
         String llmText = geminiClient.generate(systemPrompt, userPrompt);
@@ -122,9 +124,15 @@ public class DecisionHelperService {
         PromiseTimeRecommendationResponse chosenRecommendation =
                 resolveChosenRecommendation(sanitized.recommendedSlotId(), recommendations);
 
-        Long promiseId = createPromiseFromDecision(userId, roomId, request, chosenRecommendation);
+        TimeRange finalRange = resolveFinalTimeRange(sanitized, chosenRecommendation, request.minDuration());
+        sanitized = sanitized.withFinalTimeRange(
+                finalRange.start().format(CHAT_SUMMARY_TIME_FORMAT),
+                finalRange.end().format(CHAT_SUMMARY_TIME_FORMAT)
+        );
 
-        String chatSummary = buildChatSummary(sanitized, chosenRecommendation);
+        Long promiseId = createPromiseFromDecision(userId, roomId, request, chosenRecommendation, finalRange);
+
+        String chatSummary = buildChatSummary(sanitized, finalRange);
         chatMessageService.postDecisionSummary(roomId, userId, chatSummary);
 
         return sanitized.withPromiseId(promiseId);
@@ -147,6 +155,54 @@ public class DecisionHelperService {
     }
 
     /**
+     * LLM이 응답한 finalStartTime/finalEndTime(HH:mm)을 실제 사용할 시간 구간으로 확정한다.
+     * 후보(chosenRecommendation)의 startTime~endTime 범위를 벗어나거나, 순서가 뒤바뀌었거나,
+     * 최소 약속 시간(minDuration)에 못 미치거나, 파싱에 실패하면 신뢰하지 않고
+     * 후보의 전체 구간을 그대로 사용한다(기존 동작과 동일한 안전한 fallback).
+     *
+     * package-private: DecisionHelperServiceTest에서 경계값 검증을 직접 하기 위해 접근 허용
+     */
+    TimeRange resolveFinalTimeRange(
+            LLMDecisionResponseDto response,
+            PromiseTimeRecommendationResponse chosenRecommendation,
+            int minDurationMinutes
+    ) {
+        LocalDateTime candidateStart = chosenRecommendation.startTime();
+        LocalDateTime candidateEnd = chosenRecommendation.endTime();
+
+        if (response.finalStartTime() == null || response.finalEndTime() == null) {
+            return new TimeRange(candidateStart, candidateEnd);
+        }
+
+        try {
+            LocalDate date = candidateStart.toLocalDate();
+            LocalDateTime finalStart = date.atTime(LocalTime.parse(response.finalStartTime()));
+            LocalDateTime finalEnd = date.atTime(LocalTime.parse(response.finalEndTime()));
+
+            boolean withinBounds = !finalStart.isBefore(candidateStart) && !finalEnd.isAfter(candidateEnd);
+            boolean validOrder = finalStart.isBefore(finalEnd);
+            boolean meetsMinDuration = Duration.between(finalStart, finalEnd).toMinutes() >= minDurationMinutes;
+
+            if (withinBounds && validOrder && meetsMinDuration) {
+                return new TimeRange(finalStart, finalEnd);
+            }
+
+            log.warn("Gemini가 후보 범위를 벗어나거나 최소 시간에 못 미치는 finalStartTime/finalEndTime({}~{})을 " +
+                            "응답 → 후보 전체 구간({}~{})으로 대체합니다.",
+                    response.finalStartTime(), response.finalEndTime(), candidateStart, candidateEnd);
+        } catch (Exception e) {
+            log.warn("Gemini의 finalStartTime/finalEndTime 파싱 실패({} ~ {}) → 후보 전체 구간으로 대체합니다.",
+                    response.finalStartTime(), response.finalEndTime(), e);
+        }
+
+        return new TimeRange(candidateStart, candidateEnd);
+    }
+
+    // package-private: DecisionHelperServiceTest에서 결과 타입으로 직접 사용하기 위해 접근 허용
+    record TimeRange(LocalDateTime start, LocalDateTime end) {
+    }
+
+    /**
      * 결정이가 고른 시간으로 실제 약속을 생성한다.
      * 생성자(userId)는 반드시 그 시간에 가능해야 한다.
      * 초대 대상은 가능한 멤버뿐 아니라 불가능한 멤버도 포함한다 — 불가능한 멤버에게는
@@ -157,7 +213,8 @@ public class DecisionHelperService {
             Long userId,
             Long roomId,
             DecisionHelperPromiseRequest request,
-            PromiseTimeRecommendationResponse chosenRecommendation
+            PromiseTimeRecommendationResponse chosenRecommendation,
+            TimeRange finalRange
     ) {
         List<Long> availableMemberIds = chosenRecommendation.availableMembers().stream()
                 .map(PromiseRecommendationMemberResponse::userId)
@@ -187,8 +244,8 @@ public class DecisionHelperService {
                 request.categoryId(),
                 request.proposeStartDate(),
                 request.proposeEndDate(),
-                chosenRecommendation.startTime(),
-                chosenRecommendation.endTime(),
+                finalRange.start(),
+                finalRange.end(),
                 request.location(),
                 request.notificationLeadMinutes(),
                 request.minDuration(),
@@ -198,11 +255,11 @@ public class DecisionHelperService {
         return promiseService.createPromiseFromDecisionHelper(userId, roomId, createRequest);
     }
 
-    private String buildChatSummary(LLMDecisionResponseDto response, PromiseTimeRecommendationResponse chosenRecommendation) {
+    private String buildChatSummary(LLMDecisionResponseDto response, TimeRange finalRange) {
         // 약속은 항상 하루 안에서 끝나므로 날짜는 한 번만 표시한다.
-        String date = chosenRecommendation.startTime().format(CHAT_SUMMARY_DATE_FORMAT);
-        String startTime = chosenRecommendation.startTime().format(CHAT_SUMMARY_TIME_FORMAT);
-        String endTime = chosenRecommendation.endTime().format(CHAT_SUMMARY_TIME_FORMAT);
+        String date = finalRange.start().format(CHAT_SUMMARY_DATE_FORMAT);
+        String startTime = finalRange.start().format(CHAT_SUMMARY_TIME_FORMAT);
+        String endTime = finalRange.end().format(CHAT_SUMMARY_TIME_FORMAT);
 
         return "결정이의 추천시간은 " + date + " " + startTime + " ~ " + endTime + " 이에요!\n"
                 + response.reason() + "\n"
@@ -341,10 +398,14 @@ public class DecisionHelperService {
                         "우선순위 기반 fallback 후보({})로 대체합니다.",
                 parsed.recommendedSlotId(), fallbackSlotId);
 
+        // slotId 자체가 대체됐으므로, 원래 LLM이 그 slotId 기준으로 계산했던 finalStartTime/finalEndTime도
+        // 더 이상 유효하지 않다 → null로 리셋해 resolveFinalTimeRange()가 새 후보의 전체 구간으로 대체하게 한다.
         return LLMDecisionResponseDto.recommendation(
                 fallbackSlotId,
                 parsed.reason(),
                 parsed.alternativeNote(),
+                null,
+                null,
                 parsed.fallbackUsed()
         );
     }

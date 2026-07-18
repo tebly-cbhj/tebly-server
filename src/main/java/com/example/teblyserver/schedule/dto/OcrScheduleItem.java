@@ -1,6 +1,7 @@
 package com.example.teblyserver.schedule.dto;
 
 import com.example.teblyserver.schedule.domain.OcrCategoryType;
+import com.example.teblyserver.schedule.domain.RepeatType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,4 +25,7 @@ public class OcrScheduleItem {
 
     @Schema(description = "텍스트 기반 추정 카테고리 (LECTURE/WORK/ETC)", example = "LECTURE")
     private final OcrCategoryType categoryType;
+
+    @Schema(description = "반복 유형 (시간표 특성상 매주 반복으로 고정)", example = "WEEKLY")
+    private final RepeatType repeatType;
 }
