@@ -32,11 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -485,8 +484,16 @@ public class PromiseService {
                         PromiseStatus.PENDING
                 );
 
+        // 내 기본 카테고리를 한 번에 조회해서 이름 -> 카테고리 Map 구성 (N+1 방지)
+        Map<String, Category> myCategoryMap = categoryRepository
+                .findAllByUserIdAndIsDefaultTrue(userId)
+                .stream()
+                .collect(Collectors.toMap(Category::getName, c -> c, (a, b) -> a));
+
         return pendingInvitations.stream()
-                .map(PromiseInvitationResponse::from)
+                .map(pm -> PromiseInvitationResponse.from(
+                        pm,
+                        myCategoryMap.get(pm.getPromise().getCategory().getName())))
                 .toList();
     }
 

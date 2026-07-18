@@ -4,6 +4,7 @@ import com.example.teblyserver.promise.domain.Promise;
 import com.example.teblyserver.promise.domain.PromiseMember;
 import com.example.teblyserver.promise.domain.PromiseMemberStatus;
 import com.example.teblyserver.promise.domain.PromiseStatus;
+import com.example.teblyserver.schedule.domain.Category;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -20,6 +21,10 @@ public record RoomPromiseResponse(
         LocalDateTime endTime,
         String location,
 
+        Long myCategoryId,
+        String categoryName,
+        String categoryIconUrl,
+
         PromiseStatus promiseStatus,
         PromiseMemberStatus myStatus,
 
@@ -30,7 +35,7 @@ public record RoomPromiseResponse(
 ) {
 
     // 방 상세 화면의 약속 카드 하나를 만들기 위한 DTO 변환
-    public static RoomPromiseResponse of(Promise promise, Long loginUserId) {
+    public static RoomPromiseResponse of(Promise promise, Long loginUserId, Category myCategory) {
         List<PromiseMember> members = promise.getMembers();
 
         PromiseMemberStatus myStatus = members.stream()
@@ -55,6 +60,10 @@ public record RoomPromiseResponse(
                 promise.getStartTime(),
                 promise.getEndTime(),
                 promise.getLocation(),
+
+                myCategory != null ? myCategory.getId() : null,
+                promise.getCategory().getName(),
+                myCategory != null ? myCategory.getIcon() : promise.getCategory().getIcon(),
 
                 promise.getStatus(),
                 myStatus,
