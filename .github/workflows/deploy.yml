@@ -60,5 +60,7 @@ jobs:
             set -e
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             cd ~/tebly-server
+            git fetch origin develop
+            git reset --hard origin/develop
             docker compose pull
             docker compose up -d --force-recreate
