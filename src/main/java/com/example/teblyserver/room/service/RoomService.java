@@ -19,11 +19,15 @@ import com.example.teblyserver.room.dto.response.RoomMemberResponse;
 import com.example.teblyserver.room.dto.response.RoomPromiseResponse;
 import com.example.teblyserver.room.repository.RoomMemberRepository;
 import com.example.teblyserver.room.repository.RoomRepository;
+import com.example.teblyserver.schedule.domain.Category;
+import com.example.teblyserver.schedule.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +39,7 @@ public class RoomService {
     private final RoomMemberRepository roomMemberRepository;
     private final NotificationService notificationService;
     private final PromiseRepository promiseRepository;
+    private final CategoryRepository categoryRepository;
 
     /**
      * 방 생성 및 멤버 초대 로직
@@ -128,13 +133,23 @@ public class RoomService {
         // 4. 방 상세 하단의 '초대 받은 약속' 목록 조회
         List<Promise> invitedPromises = promiseRepository.findInvitedPromisesInRoom(roomId, userId);
 
-        // 5. 약속 엔티티를 방 상세 약속 카드 DTO로 변환
+        // 5. 내 기본 카테고리를 한 번에 조회해서 이름 -> 카테고리 Map 구성 (N+1 방지)
+        Map<String, Category> myCategoryMap = categoryRepository
+                .findAllByUserIdAndIsDefaultTrue(userId)
+                .stream()
+                .collect(Collectors.toMap(Category::getName, c -> c, (a, b) -> a));
+
+        // 6. 약속 엔티티를 방 상세 약속 카드 DTO로 변환
         List<RoomPromiseResponse> myPromiseResponses = myPromises.stream()
-                .map(promise -> RoomPromiseResponse.of(promise, userId))
+                .map(promise -> RoomPromiseResponse.of(
+                        promise, userId,
+                        myCategoryMap.get(promise.getCategory().getName())))
                 .toList();
 
         List<RoomPromiseResponse> invitedPromiseResponses = invitedPromises.stream()
-                .map(promise -> RoomPromiseResponse.of(promise, userId))
+                .map(promise -> RoomPromiseResponse.of(
+                        promise, userId,
+                        myCategoryMap.get(promise.getCategory().getName())))
                 .toList();
 
         // 3. 엔티티를 화면 맞춤형 DTO로 변환하여 반환

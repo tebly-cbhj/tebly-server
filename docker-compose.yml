@@ -37,6 +37,8 @@ services:
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      TZ: Asia/Seoul
+      JAVA_TOOL_OPTIONS: "-Duser.timezone=Asia/Seoul"
     volumes:
       - /home/ubuntu/tebly-uploads:/app/uploads
     depends_on:
