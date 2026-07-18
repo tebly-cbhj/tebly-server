@@ -49,7 +49,8 @@ public class SanitizeService {
         String reason = reasonHit ? REASON_FALLBACK : response.reason();
         String alternativeNote = alternativeNoteHit ? null : response.alternativeNote();
 
-        return LLMDecisionResponseDto.recommendation(response.recommendedSlotId(), reason, alternativeNote, "true");
+        return LLMDecisionResponseDto.recommendation(response.recommendedSlotId(), reason, alternativeNote,
+                response.finalStartTime(), response.finalEndTime(), "true");
     }
 
     private LLMDecisionResponseDto sanitizeAlternative(LLMDecisionResponseDto response, List<String> memberNames) {
