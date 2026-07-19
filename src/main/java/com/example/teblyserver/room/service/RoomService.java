@@ -2,6 +2,7 @@ package com.example.teblyserver.room.service;
 
 import com.example.teblyserver.auth.domain.User;
 import com.example.teblyserver.auth.repository.UserRepository;
+import com.example.teblyserver.chat.repository.ChatMessageRepository;
 import com.example.teblyserver.common.exception.CustomException;
 import com.example.teblyserver.common.exception.ErrorCode;
 import com.example.teblyserver.notification.domain.NotificationType;
@@ -25,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +42,7 @@ public class RoomService {
     private final NotificationService notificationService;
     private final PromiseRepository promiseRepository;
     private final CategoryRepository categoryRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     /**
      * 방 생성 및 멤버 초대 로직
@@ -97,18 +100,44 @@ public class RoomService {
      */
     public List<RoomListResponse> getRooms(Long userId, String type) {
 
-        // 1. type 파라미터 분석 ('invited' 면 PENDING, 아니면 ('joined') ACCEPTED)
-        InviteStatus targetStatus = "invited".equalsIgnoreCase(type) ? InviteStatus.PENDING : InviteStatus.ACCEPTED;
+        InviteStatus targetStatus = "invited".equalsIgnoreCase(type)
+                ? InviteStatus.PENDING : InviteStatus.ACCEPTED;
 
-        // 2. 해당 상태의 방 목록 긁어오기
         List<Room> rooms = roomMemberRepository.findRoomsByUserIdAndInviteStatus(userId, targetStatus);
 
-        // 3. 엔티티를 프론트엔드가 그리기 좋은 DTO로 변환
+        List<Long> roomIds = rooms.stream().map(Room::getId).toList();
+
+        // 안읽은 메시지 개수를 한 번에 집계 (N+1 방지)
+        Map<Long, Long> unreadMap = roomIds.isEmpty()
+                ? Map.of()
+                : chatMessageRepository.countUnreadByRooms(userId, roomIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]));
+
         return rooms.stream()
-                .map(RoomListResponse::of)
+                .map(room -> RoomListResponse.of(room, unreadMap.getOrDefault(room.getId(), 0L)))
                 .toList();
     }
+    /**
+     * 방 채팅 읽음 처리
+     * 방에 입장하거나 채팅 화면을 열 때 호출
+     */
+    @Transactional
+    public void markChatAsRead(Long userId, Long roomId) {
 
+        roomRepository.findById(roomId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_NOT_FOUND));
+
+        RoomMember member = roomMemberRepository
+                .findByRoomIdAndUserIdAndIsDeletedFalse(roomId, userId)
+                .stream()
+                .filter(rm -> rm.getInviteStatus() == InviteStatus.ACCEPTED)
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ErrorCode.ROOM_FORBIDDEN));
+
+        member.markChatAsRead(LocalDateTime.now());
+    }
     /**
      * 방 상세 정보 조회
      * 상단 방 정보 + 하단 내 약속/초대받은 약속 목록까지 함께 반환

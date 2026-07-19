@@ -51,6 +51,9 @@ public class RoomMember {
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 
+    @Column(name = "last_read_at")
+    private LocalDateTime lastReadAt;
+
     // 정적 팩토리 메서드 (객체 생성과 동시에 양방향 연관관계 세팅)
     public static RoomMember create(Room room, User user, RoomRole role, InviteStatus inviteStatus) {
         RoomMember roomMember = new RoomMember();
@@ -81,4 +84,6 @@ public class RoomMember {
     public void delete() {
         this.isDeleted = true;
     }
+
+    public void markChatAsRead(LocalDateTime readAt) { this.lastReadAt = readAt; }
 }
