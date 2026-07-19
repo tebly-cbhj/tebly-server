@@ -83,6 +83,12 @@ public class Promise {
     @Column(nullable = false)
     private boolean isDeleted = false;
 
+    // 결정이(Decision Helper)가 생성한 약속인지 여부.
+    // 초대장 화면에서 "결정이 발신" 표시와 상황별 메시지 노출 여부를 프론트가 판단하는 데 쓰인다.
+    // columnDefinition의 default는 기존 데이터가 있는 운영 DB에 not null 컬럼을 추가하기 위해 필요하다.
+    @Column(name = "created_by_decision_helper", nullable = false, columnDefinition = "boolean default false")
+    private boolean createdByDecisionHelper = false;
+
     // 약속에 참여하는 멤버 목록
     @OneToMany(mappedBy = "promise", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PromiseMember> members = new ArrayList<>();
@@ -114,6 +120,11 @@ public class Promise {
         promise.minDuration = minDuration;
         promise.status = PromiseStatus.PENDING;
         return promise;
+    }
+
+    // 결정이(Decision Helper) 경로로 생성된 약속임을 표시
+    public void markCreatedByDecisionHelper() {
+        this.createdByDecisionHelper = true;
     }
 
     public void update(
