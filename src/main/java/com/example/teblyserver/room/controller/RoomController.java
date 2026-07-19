@@ -185,4 +185,18 @@ public class RoomController {
 
         return ResponseEntity.ok(ApiResponse.success(new RoomImageUploadResponse(imageUrl)));
     }
+
+    /**
+     * 방 채팅 읽음 처리 API
+     * URL: PATCH /rooms/{roomId}/chat/read
+     */
+    @PatchMapping("/{roomId}/chat/read")
+    public ResponseEntity<ApiResponse<Void>> markChatAsRead(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long roomId
+    ) {
+        roomService.markChatAsRead(userId, roomId);
+
+        return ResponseEntity.ok(ApiResponse.success("채팅 읽음 처리가 완료되었습니다.", null));
+    }
 }
