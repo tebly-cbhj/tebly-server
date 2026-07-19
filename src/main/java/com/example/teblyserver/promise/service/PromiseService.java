@@ -43,7 +43,7 @@ public class PromiseService {
 
     // 충돌 일정이 이 카테고리들 뿐이면 "조정 가능한" 낮은 중요도로 간주한다.
     // (실제 기본 카테고리 시드 데이터 철자가 "자기개발"이라 그대로 맞춤 — "자기계발"은 오탈자로 보임)
-    private static final Set<String> LOW_IMPORTANCE_CATEGORY_NAMES = Set.of("여가", "자기개발");
+    private static final Set<String> LOW_IMPORTANCE_CATEGORY_NAMES = Set.of("여가", "자기개발","기타", "약속");
 
     private final PromiseRepository promiseRepository;
     private final RoomRepository roomRepository;
