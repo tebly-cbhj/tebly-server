@@ -43,6 +43,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             s.id,
             s.user.id,
             s.title,
+            s.category.id,
             s.category.name,
             s.startTime,
             s.endTime,

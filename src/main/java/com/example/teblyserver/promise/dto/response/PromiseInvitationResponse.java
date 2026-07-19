@@ -34,6 +34,9 @@ public record PromiseInvitationResponse(
         // 초대받은 사람(나)이 약속 시간에 이미 겹치는 일정이 있는지
         boolean hasScheduleConflict,
 
+        // 겹치는 일정의 카테고리 ID (충돌 없으면 null)
+        Long conflictingCategoryId,
+
         // 겹치는 일정의 카테고리명 (충돌 없으면 null).
         // 중요도 높은 카테고리 충돌이 하나라도 있으면 그 카테고리를 대표로 내려준다.
         String conflictingCategoryName,
@@ -72,6 +75,7 @@ public record PromiseInvitationResponse(
                 promise.isCreatedByDecisionHelper(),
 
                 representativeConflict != null,
+                representativeConflict != null ? representativeConflict.categoryId() : null,
                 representativeConflict != null ? representativeConflict.categoryName() : null,
                 representativeConflict != null ? representativeConflict.title() : null
         );
