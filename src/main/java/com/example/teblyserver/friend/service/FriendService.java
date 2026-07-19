@@ -30,10 +30,10 @@ public class FriendService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         List<FriendResponse> friends = friendshipRepository.findByRequester(user)
-                .stream().map(f -> new FriendResponse(f.getReceiver())).toList();
+                .stream().map(f -> FriendResponse.of(f.getReceiver(), f.isRequesterFavorite())).toList();
 
         List<FriendResponse> received = friendshipRepository.findByReceiver(user)
-                .stream().map(f -> new FriendResponse(f.getRequester())).toList();
+                .stream().map(f -> FriendResponse.of(f.getRequester(), f.isReceiverFavorite())).toList();
 
         List<FriendResponse> result = new java.util.ArrayList<>(friends);
         result.addAll(received);
@@ -44,7 +44,22 @@ public class FriendService {
     public FriendResponse previewByCode(String inviteCode) {
         User user = userRepository.findByInvitationCode(inviteCode)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        return new FriendResponse(user);
+        return FriendResponse.of(user);
+    }
+
+    // 친구 즐겨찾기 설정/해제 (즐겨찾기는 설정한 유저 본인에게만 적용)
+    @Transactional
+    public void updateFavorite(Long userId, Long friendId, boolean favorite) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        User friend = userRepository.findById(friendId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        Friendship friendship = friendshipRepository.findByRequesterAndReceiver(user, friend)
+                .orElseGet(() -> friendshipRepository.findByRequesterAndReceiver(friend, user)
+                        .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND)));
+
+        friendship.updateFavorite(user, favorite);
     }
 
     // 초대 코드로 친구 추가
