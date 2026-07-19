@@ -16,6 +16,7 @@ public record BusyScheduleTimeRange(
         Long scheduleId,
         Long userId,
         String title,
+        Long categoryId,
         String categoryName,
         LocalDateTime startTime,
         LocalDateTime endTime,

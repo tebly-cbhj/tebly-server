@@ -620,6 +620,7 @@ public class PromiseRecommendationService {
                         schedule.scheduleId(),
                         schedule.userId(),
                         schedule.title(),
+                        schedule.categoryId(),
                         schedule.categoryName(),
                         occurrenceStart,
                         occurrenceEnd,
