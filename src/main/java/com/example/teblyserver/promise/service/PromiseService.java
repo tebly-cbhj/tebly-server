@@ -60,7 +60,7 @@ public class PromiseService {
      */
     @Transactional
     public Long createPromise(Long userId, Long roomId, PromiseCreateRequest request) {
-        return createPromiseInternal(userId, roomId, request, this::buildStandardInvitationMessage);
+        return createPromiseInternal(userId, roomId, request, this::buildStandardInvitationMessage, false);
     }
 
     /**
@@ -69,14 +69,15 @@ public class PromiseService {
      */
     @Transactional
     public Long createPromiseFromDecisionHelper(Long userId, Long roomId, PromiseCreateRequest request) {
-        return createPromiseInternal(userId, roomId, request, this::buildInvitationMessage);
+        return createPromiseInternal(userId, roomId, request, this::buildInvitationMessage, true);
     }
 
     private Long createPromiseInternal(
             Long userId,
             Long roomId,
             PromiseCreateRequest request,
-            BiFunction<Promise, User, String> invitationMessageBuilder
+            BiFunction<Promise, User, String> invitationMessageBuilder,
+            boolean fromDecisionHelper
     ) {
 
         // 1. 필요한 엔티티들 조회 (유저, 방)
@@ -123,6 +124,10 @@ public class PromiseService {
                 request.startTime(), request.endTime(),
                 request.location(), request.notificationLeadMinutes(), request.minDuration()
         );
+
+        if (fromDecisionHelper) {
+            promise.markCreatedByDecisionHelper();
+        }
 
         // 약속 생성자는 항상 PromiseMember에 포함하고 ACCEPTED 처리
         PromiseMember senderPromiseMember = PromiseMember.create(sender, promise);
@@ -493,8 +498,35 @@ public class PromiseService {
         return pendingInvitations.stream()
                 .map(pm -> PromiseInvitationResponse.from(
                         pm,
-                        myCategoryMap.get(pm.getPromise().getCategory().getName())))
+                        myCategoryMap.get(pm.getPromise().getCategory().getName()),
+                        findRepresentativeConflict(userId, pm.getPromise())))
                 .toList();
+    }
+
+    /**
+     * 초대받은 사람(userId)이 약속 시간과 겹치는 일정을 갖고 있는지 조회해 대표 충돌 일정을 반환한다.
+     * (충돌 없으면 null)
+     *
+     * 대표 선정 기준은 초대 메시지(buildInvitationMessage)와 동일한 판단을 프론트가 재현할 수 있도록,
+     * 중요도 높은(낮은 중요도 카테고리가 아닌) 충돌이 하나라도 있으면 그 일정을 우선 반환한다.
+     * 전부 낮은 중요도라면 첫 번째 충돌 일정을 반환한다 ("'OO' 일정이 있는데 조정 가능할까요?" 문구의 기준).
+     */
+    private BusyScheduleTimeRange findRepresentativeConflict(Long userId, Promise promise) {
+        List<BusyScheduleTimeRange> conflicts = promiseRecommendationService.findExpandedSchedulesInWindow(
+                List.of(userId),
+                promise.getStartTime().toLocalDate(),
+                promise.getStartTime(),
+                promise.getEndTime()
+        );
+
+        if (conflicts.isEmpty()) {
+            return null;
+        }
+
+        return conflicts.stream()
+                .filter(conflict -> !LOW_IMPORTANCE_CATEGORY_NAMES.contains(conflict.categoryName()))
+                .findFirst()
+                .orElse(conflicts.get(0));
     }
 
 
