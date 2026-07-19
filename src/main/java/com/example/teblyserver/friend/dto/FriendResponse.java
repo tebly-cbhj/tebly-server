@@ -1,19 +1,27 @@
 package com.example.teblyserver.friend.dto;
 
 import com.example.teblyserver.auth.domain.User;
-import lombok.Getter;
 
-@Getter
-public class FriendResponse {
-    private Long id;
-    private String nickname;
-    private String bio;
-    private String profileImageUrl;
+public record FriendResponse(
+        Long id,
+        String nickname,
+        String bio,
+        String profileImageUrl,
+        boolean isFavorite
+) {
 
-    public FriendResponse(User user) {
-        this.id = user.getId();
-        this.nickname = user.getNickname();
-        this.bio = user.getBio();
-        this.profileImageUrl = user.getProfileImageUrl();
+    public static FriendResponse of(User user, boolean isFavorite) {
+        return new FriendResponse(
+                user.getId(),
+                user.getNickname(),
+                user.getBio(),
+                user.getProfileImageUrl(),
+                isFavorite
+        );
+    }
+
+    // 미리보기 등 아직 친구 관계가 아닌 상대를 반환할 때 (즐겨찾기 여부 없음 → false)
+    public static FriendResponse of(User user) {
+        return of(user, false);
     }
 }

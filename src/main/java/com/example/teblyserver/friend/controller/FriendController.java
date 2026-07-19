@@ -2,10 +2,12 @@ package com.example.teblyserver.friend.controller;
 
 import com.example.teblyserver.common.response.ApiResponse;
 import com.example.teblyserver.friend.dto.FriendCodeRequest;
+import com.example.teblyserver.friend.dto.FriendFavoriteRequest;
 import com.example.teblyserver.friend.dto.FriendLinkRequest;
 import com.example.teblyserver.friend.dto.FriendResponse;
 import com.example.teblyserver.friend.service.FriendService;
 import com.example.teblyserver.schedule.dto.response.ScheduleResponseDto;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -50,6 +52,16 @@ public class FriendController {
             @AuthenticationPrincipal Long userId,
             @RequestBody FriendLinkRequest request) {
         friendService.addFriendByLink(userId, request.inviteToken());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 친구 즐겨찾기 설정/해제
+    @PatchMapping("/{friendId}/favorite")
+    public ResponseEntity<ApiResponse<Void>> updateFavorite(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long friendId,
+            @Valid @RequestBody FriendFavoriteRequest request) {
+        friendService.updateFavorite(userId, friendId, request.isFavorite());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
