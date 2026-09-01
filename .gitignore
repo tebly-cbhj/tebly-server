@@ -35,3 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Env ###
+.env
+src/main/resources/application-local.yml
+local-uploads/
+local-uploads/
